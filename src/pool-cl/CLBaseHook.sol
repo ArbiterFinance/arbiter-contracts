@@ -36,6 +36,33 @@ contract CLBaseHook is ICLHooks {
         bool afterRemoveLiquidityReturnsDelta;
     }
 
+    function getHooksRegistrationBitmap()
+        external
+        view
+        virtual
+        returns (uint16)
+    {
+        return
+            _hooksRegistrationBitmapFrom(
+                Permissions({
+                    beforeInitialize: false,
+                    afterInitialize: false,
+                    beforeAddLiquidity: false,
+                    afterAddLiquidity: false,
+                    beforeRemoveLiquidity: false,
+                    afterRemoveLiquidity: false,
+                    beforeSwap: false,
+                    afterSwap: false,
+                    beforeDonate: false,
+                    afterDonate: false,
+                    beforeSwapReturnsDelta: false,
+                    afterSwapReturnsDelta: false,
+                    afterAddLiquidityReturnsDelta: false,
+                    afterRemoveLiquidityReturnsDelta: false
+                })
+            );
+    }
+
     /// @notice The address of the pool manager
     ICLPoolManager public immutable poolManager;
 
@@ -75,7 +102,7 @@ contract CLBaseHook is ICLHooks {
     ///      https://github.com/pancakeswap/pancake-v4-hooks oh hooks which perform vault.lock()
     function lockAcquired(
         bytes calldata data
-    ) external vaultOnly returns (bytes memory) {
+    ) external virtual vaultOnly returns (bytes memory) {
         (bool success, bytes memory returnData) = address(this).call(data);
         if (success) return returnData;
         if (returnData.length == 0) revert LockFailure();
@@ -89,9 +116,8 @@ contract CLBaseHook is ICLHooks {
     function beforeInitialize(
         address,
         PoolKey calldata,
-        uint160,
-        bytes calldata
-    ) external returns (bytes4) {
+        uint160
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
@@ -99,9 +125,8 @@ contract CLBaseHook is ICLHooks {
         address,
         PoolKey calldata,
         uint160,
-        int24,
-        bytes calldata
-    ) external returns (bytes4) {
+        int24
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
@@ -110,7 +135,7 @@ contract CLBaseHook is ICLHooks {
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
@@ -119,8 +144,9 @@ contract CLBaseHook is ICLHooks {
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
+        BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external virtual returns (bytes4, BalanceDelta) {
         revert HookNotImplemented();
     }
 
@@ -129,7 +155,7 @@ contract CLBaseHook is ICLHooks {
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
@@ -138,8 +164,9 @@ contract CLBaseHook is ICLHooks {
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
+        BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, BalanceDelta) {
+    ) external virtual returns (bytes4, BalanceDelta) {
         revert HookNotImplemented();
     }
 
@@ -148,7 +175,7 @@ contract CLBaseHook is ICLHooks {
         PoolKey calldata,
         ICLPoolManager.SwapParams calldata,
         bytes calldata
-    ) external returns (bytes4, BeforeSwapDelta, uint24) {
+    ) external virtual returns (bytes4, BeforeSwapDelta, uint24) {
         revert HookNotImplemented();
     }
 
@@ -158,7 +185,7 @@ contract CLBaseHook is ICLHooks {
         ICLPoolManager.SwapParams calldata,
         BalanceDelta,
         bytes calldata
-    ) external returns (bytes4, int128) {
+    ) external virtual returns (bytes4, int128) {
         revert HookNotImplemented();
     }
 
@@ -168,7 +195,7 @@ contract CLBaseHook is ICLHooks {
         uint256,
         uint256,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
@@ -178,7 +205,7 @@ contract CLBaseHook is ICLHooks {
         uint256,
         uint256,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 

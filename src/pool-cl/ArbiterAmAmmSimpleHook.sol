@@ -65,7 +65,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     mapping(PoolId => PoolHookState) public poolHookStates;
     mapping(PoolId => RentData) public rentDatas;
     mapping(PoolId => address) public winners;
-    mapping(PoolId => uint256) public winnerStrategies;
+    mapping(PoolId => address) public winnerStrategies;
     mapping(address => mapping(Currency => uint256)) public deposits;
 
     bool immutable RENT_IN_TOKEN_ZERO;
@@ -111,7 +111,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
                     beforeSwapReturnsDelta: true,
                     afterSwapReturnsDelta: false,
                     afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidiyReturnsDelta: false
+                    afterRemoveLiquidityReturnsDelta: false
                 })
             );
     }
@@ -120,12 +120,10 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function beforeInitialize(
         address,
         PoolKey calldata key,
-        uint160,
-        bytes calldata data
+        uint160
     ) external override poolManagerOnly returns (bytes4) {
         // Pool must have dynamic fee flag set. This is so we can override the LP fee in `beforeSwap`.
-        if (!key.fee.isDynamicFee()) revert NotDynamicFee();
-        if (data.length != 1) revert InitData();
+        if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
 
         poolHookStates[key.toId()] = PoolHookState({
             strategy: address(1),
@@ -195,15 +193,13 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
         // TODO: check if this is correct
 
-        uint256 feesForLps = 0;
         bool exactOut = params.amountSpecified > 0;
         Currency feeCurrency = exactOut != params.zeroForOne
             ? key.currency0
             : key.currency1;
 
         // // Send fees to `feeRecipient`
-        _payRent(key, feesForLps);
-        poolManager.mint(strategy, feeCurrency.toId(), absFees);
+        vault.mint(strategy, feeCurrency, absFees);
 
         // Override LP fee to zero
         return (
@@ -234,7 +230,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         address asset,
         address account
     ) external view override returns (uint256) {
-        return deposits[account][Currency(asset)];
+        return deposits[account][Currency.wrap(asset)];
     }
 
     function _getPoolRentCurrency(
@@ -247,7 +243,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function biddingCurrency(
         PoolKey calldata key
     ) external view override returns (address) {
-        return address(_getPoolRentCurrency(key));
+        return Currency.unwrap(_getPoolRentCurrency(key));
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -261,7 +257,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function winnerStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        return poolHookStates[key.toId()].winnerStrategy;
+        return winnerStrategies[key.toId()];
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -288,10 +284,8 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
         // Deposit 6909 claim tokens to Uniswap V4 PoolManager. The claim tokens are owned by this contract.
-        poolManager.lock(
-            abi.encode(CallbackData(asset, msg.sender, amount, 0))
-        );
-        deposits[msg.sender][Currency(asset)] += amount;
+        vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
+        deposits[msg.sender][Currency.wrap(asset)] += amount;
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -338,7 +332,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         // set up new rent
         rentData.remainingRent = requiredDeposit;
         rentData.rentEndBlock = rentEndBlockNumber;
-        rentData.changeStrategy = true;
+        rentData.shouldChangeStrategy = true;
         hookState.rentPerBlock = rent;
 
         rentDatas[key.toId()] = rentData;
@@ -349,15 +343,13 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function withdraw(address asset, uint256 amount) external override {
-        uint256 depositAmount = deposits[msg.sender][Currency(asset)];
+        uint256 depositAmount = deposits[msg.sender][Currency.wrap(asset)];
         unchecked {
             require(depositAmount >= amount, "Deposit too low");
-            deposits[msg.sender][Currency(asset)] = depositAmount - amount;
+            deposits[msg.sender][Currency.wrap(asset)] = depositAmount - amount;
         }
         // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
-        poolManager.lock(
-            abi.encode(CallbackData(asset, msg.sender, 0, amount))
-        );
+        vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -367,7 +359,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     ) external override {
         require(msg.sender == winners[key.toId()], "Not winner");
         poolHookStates[key.toId()].strategy = strategy;
-        rentDatas[key.toId()].changeStrategy = true;
+        rentDatas[key.toId()].shouldChangeStrategy = true;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -380,26 +372,26 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     ) external override vaultOnly returns (bytes memory) {
         CallbackData memory data = abi.decode(rawData, (CallbackData));
         if (data.depositAmount > 0) {
-            poolManager.burn(
+            vault.burn(
                 data.sender,
-                Currency(data.currency).toId(),
+                Currency.wrap(data.currency),
                 data.depositAmount
             );
-            poolManager.mint(
+            vault.mint(
                 address(this),
-                Currency(data.currency),
+                Currency.wrap(data.currency),
                 data.depositAmount
             );
         }
         if (data.withdrawAmount > 0) {
-            poolManager.burn(
+            vault.burn(
                 address(this),
-                Currency(data.currency),
+                Currency.wrap(data.currency),
                 data.withdrawAmount
             );
-            poolManager.mint(
+            vault.mint(
                 data.sender,
-                Currency(data.currency),
+                Currency.wrap(data.currency),
                 data.withdrawAmount
             );
         }
@@ -413,12 +405,8 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     /// @notice Donates rent plus rent swapFeeToLP to the pool.
     /// @dev Must be called while lock is acquired.
     /// @param key Pool key.
-    /// @param swapFeeToLP amount of swap fee to be paid to LPs.
     /// @return address of the strategy to be used for the next swap.
-    function _payRent(
-        PoolKey memory key,
-        uint128 swapFeeToLP
-    ) internal returns (address) {
+    function _payRent(PoolKey memory key) internal returns (address) {
         RentData memory rentData = rentDatas[key.toId()];
         PoolHookState memory hookState = poolHookStates[key.toId()];
 
@@ -431,9 +419,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
 
         bool hookStateChanged = false;
         // check if we need to change strategy
-        if (rentData.changeStrategy) {
+        if (rentData.shouldChangeStrategy) {
             hookState.strategy = winnerStrategies[key.toId()];
-            rentData.changeStrategy = false;
+            rentData.shouldChangeStrategy = false;
             hookStateChanged = true;
         }
 
@@ -442,7 +430,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             blocksElapsed = rentData.rentEndBlock - rentData.lastPaidBlock;
             winners[key.toId()] = address(0);
             winnerStrategies[key.toId()] = address(0);
-            rentData.changeStrategy = true;
+            rentData.shouldChangeStrategy = true;
             hookState.rentPerBlock = 0;
             hookStateChanged = true;
         } else {
@@ -459,7 +447,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             // pay the rent
             Currency currency = _getPoolRentCurrency(key);
 
-            poolManager.burn(address(this), currency.toId(), rentAmount);
+            vault.burn(address(this), currency, rentAmount);
             poolManager.donate(key, rentAmount, 0, "");
         }
 

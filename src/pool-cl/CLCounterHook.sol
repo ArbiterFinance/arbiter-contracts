@@ -62,6 +62,7 @@ contract CLCounterHook is CLBaseHook {
         PoolKey calldata key,
         ICLPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
+        BalanceDelta,
         bytes calldata
     ) external override poolManagerOnly returns (bytes4, BalanceDelta) {
         afterAddLiquidityCount[key.toId()]++;

@@ -21,8 +21,8 @@ import {CustomRevert} from "lib/pancake-v4-core/src/libraries/CustomRevert.sol";
 library PoolExtension {
     using SafeCast for *;
     using TickBitmap for mapping(int16 => uint256);
-    using Position for mapping(bytes32 => Position.State);
-    using Position for Position.State;
+    using CLPosition for mapping(bytes32 => CLPosition.Info);
+    using CLPosition for CLPosition.Info;
     using PoolExtension for State;
     using ProtocolFeeLibrary for *;
     using LPFeeLibrary for uint24;
@@ -46,7 +46,7 @@ library PoolExtension {
         uint128 liquidity;
         mapping(int24 tick => TickInfo) ticks;
         mapping(int16 wordPos => uint256) tickBitmap;
-        mapping(bytes32 positionKey => Position.State) positions;
+        mapping(bytes32 positionKey => CLPosition.Info) positions;
     }
 
     function _secondsPerLiquidityInsideX128(
