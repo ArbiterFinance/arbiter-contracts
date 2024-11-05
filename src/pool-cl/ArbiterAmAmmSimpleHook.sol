@@ -9,10 +9,10 @@ import {Hooks} from "lib/pancake-v4-core/src/libraries/Hooks.sol";
 import {LPFeeLibrary} from "lib/pancake-v4-core/src/libraries/LPFeeLibrary.sol";
 import {PoolId, PoolIdLibrary} from "lib/pancake-v4-core/src/types/PoolId.sol";
 import {PoolKey} from "lib/pancake-v4-core/src/types/PoolKey.sol";
-import {SafeCast} from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {TickMath} from "lib/pancake-v4-core/src/pool-cl/libraries/TickMath.sol";
 
-import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Minimal} from "lib/pancake-v4-core/src/interfaces/IERC20Minimal.sol";
 import {ICLPoolManager} from "lib/pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
