@@ -2,19 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
-import {Test} from "lib/forge-std/Test.sol";
-import {Constants} from "lib/pancake-v4-core/test/pool-cl/helpers/Constants.sol";
-import {Currency} from "lib/pancake-v4-core/src/types/Currency.sol";
-import {PoolKey} from "lib/pancake-v4-core/src/types/PoolKey.sol";
-import {CLPoolParametersHelper} from "lib/pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {Test} from "forge-std/Test.sol";
+import {Constants} from "pancake-v4-core/test/pool-cl/helpers/Constants.sol";
+import {Currency} from "pancake-v4-core/src/types/Currency.sol";
+import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
+import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 import {CLCounterHook} from "../../src/pool-cl/CLCounterHook.sol";
 import {CLTestUtils} from "./utils/CLTestUtils.sol";
-import {CLPoolParametersHelper} from "lib/pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
-import {PoolIdLibrary} from "lib/pancake-v4-core/src/types/PoolId.sol";
-import {ICLRouterBase} from "lib/pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
-import {IHooks} from "lib/pancake-v4-core/src/interfaces/IHooks.sol";
-import {ICLPoolManager} from "lib/pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {IPoolManager} from "lib/pancake-v4-core/src/interfaces/IPoolManager.sol";
+import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
+import {ICLRouterBase} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
+import {IHooks} from "pancake-v4-core/src/interfaces/IHooks.sol";
+import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {IPoolManager} from "pancake-v4-core/src/interfaces/IPoolManager.sol";
 
 contract CLCounterHookTest is Test, CLTestUtils {
     using PoolIdLibrary for PoolKey;
@@ -23,18 +23,14 @@ contract CLCounterHookTest is Test, CLTestUtils {
     CLCounterHook hook;
     Currency currency0;
     Currency currency1;
-    PoolKey _key;
-
-    function key() internal view returns (PoolKey memory) {
-        return _key;
-    }
+    PoolKey key;
 
     function setUp() public {
         (currency0, currency1) = deployContractsWithTokens();
         hook = new CLCounterHook(ICLPoolManager(address(poolManager)));
 
         // create the pool key
-        _key = PoolKey({
+        key = PoolKey({
             currency0: currency0,
             currency1: currency1,
             hooks: IHooks(hook),
@@ -46,11 +42,11 @@ contract CLCounterHookTest is Test, CLTestUtils {
         });
 
         // initialize pool at 1:1 price point (assume stablecoin pair)
-        poolManager.initialize(key(), Constants.SQRT_RATIO_1_1, new bytes(0));
+        poolManager.initialize(key, Constants.SQRT_RATIO_1_1);
     }
 
     function testLiquidityCallback() public {
-        assertEq(hook.beforeAddLiquidityCount(key), 0);
+        assertEq(hook.beforeAddLiquidityCount(key.toId()), 0);
         assertEq(hook.afterAddLiquidityCount(key.toId()), 0);
 
         MockERC20(Currency.unwrap(currency0)).mint(address(this), 1 ether);
@@ -76,7 +72,6 @@ contract CLCounterHookTest is Test, CLTestUtils {
                 zeroForOne: true,
                 amountIn: 0.1 ether,
                 amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0,
                 hookData: new bytes(0)
             })
         );
