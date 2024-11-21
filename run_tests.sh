@@ -1,2 +1,2 @@
 forge build
-forge test
+forge test -vvv

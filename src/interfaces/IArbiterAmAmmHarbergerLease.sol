@@ -8,13 +8,13 @@ import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
 /// @notice The auctioned assets are the rights to control and collect swap fees from V4 liquidity pools.
 /// @dev strategy SHOULD implement IArbiterAmAmmStrategy
 interface IArbiterAmAmmHarbergerLease {
-    /// @return  The minimum time in blocks that a overbidding rent must last
+    /// @return  The minimum time in blocks that an overbidding rent must last
     function MINIMUM_RENT_TIME_IN_BLOCKS() external view returns (uint48);
 
     /// @return The required factor by which an overbidding rent must exceed the current rent, unless the current rent finishes in fewer than TRANSITION_BLOCKS.
     function RENT_FACTOR() external view returns (uint64);
 
-    /// @return The number of block before the end of the rent when any bid is overbiddding the current rent
+    /// @return The number of blocks before the end of the rent when any bid is overbidding the current rent
     function TRANSTION_BLOCKS() external view returns (uint48);
 
     /// @return The gas limit for the getSwapFee call
@@ -40,7 +40,7 @@ interface IArbiterAmAmmHarbergerLease {
         PoolKey calldata key
     ) external view returns (address);
 
-    /// @dev If the winnerStrategy is different from the activeStrategy, then the active strategy will be changed for the winner strategy during next rentPayment
+    /// @dev If the winnerStrategy is different from the activeStrategy, then the active strategy will be changed for the winner strategy during next rent payment
     /// @return The address of the winning Strategy for the pool
     /// @param key The key of the pool to check
     function winnerStrategy(
@@ -55,7 +55,7 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param key The key of the pool to check
     function rentPerBlock(PoolKey calldata key) external view returns (uint96);
 
-    /// @return The the block number of the last rent payment
+    /// @return The block number of the last rent payment
     /// @param key The key of the pool to check
     function rentEndBlock(PoolKey calldata key) external view returns (uint48);
 
@@ -64,7 +64,7 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param amount The amount of the ERC20 to deposit
     function deposit(address asset, uint256 amount) external;
 
-    /// @notice Overbids the current rent for the pool - rentPerBlock * (rentEndBlock - block.number) are substracted from the msg.sender deposit
+    /// @notice Overbids the current rent for the pool - rentPerBlock * (rentEndBlock - block.number) are subtracted from the msg.sender deposit
     /// @notice If there is a previous winning bid, the rent is refunded to the deposit
     /// @dev The rent must be higher than the current rent by RENT_FACTOR unless the current rent finishes in less than transition_blocks
     /// @dev The rentEndBlock must be at least minimumRentTimeInBlocks in the future
@@ -90,4 +90,11 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param key The key of the pool to change the strategy for
     /// @param strategy The address of the new strategy
     function changeStrategy(PoolKey calldata key, address strategy) external;
+
+    error NotDynamicFee();
+    error RentTooLow();
+    error RentTooShort();
+    error PoolNotInitialized();
+    error InsufficientDeposit();
+    error CallerNotWinner();
 }

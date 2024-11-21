@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ICLHooks} from "pancake-v4-core/src/pool-cl/interfaces/ICLHooks.sol";
 import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
 import {ICLSubscriber} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLSubscriber.sol";
 
 /// @title Liquidity Per Second TrackerHook
 /// @notice This hook is used to track the liquidity per second of subscribed liquidity within pools like in V3.
-interface ILiquididityPerSecondTrackerHook is ICLSubscriber, ICLHooks {
+interface ILiquididityPerSecondTrackerHook is ICLSubscriber {
     /// @return The seconds per **subscribed** liquidity cumulative for the pool
     /// @param key The key of the pool to check
     function getSecondsPerLiquidityCumulativeX128(

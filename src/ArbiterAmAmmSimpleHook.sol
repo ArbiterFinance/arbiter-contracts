@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {BalanceDelta, toBalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {CLBaseHook} from "./CLBaseHook.sol";
+import {CLBaseHook} from "./pool-cl/CLBaseHook.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
 import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
@@ -17,13 +17,14 @@ import {IERC20Minimal} from "pancake-v4-core/src/interfaces/IERC20Minimal.sol";
 import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
 import {ILockCallback} from "pancake-v4-core/src/interfaces/ILockCallback.sol";
+import {console} from "forge-std/console.sol";
 
 import {IArbiterAmAmmHarbergerLease} from "./interfaces/IArbiterAmAmmHarbergerLease.sol";
 
 uint24 constant DEFAULT_SWAP_FEE = 300; // 0.03%
 uint24 constant MAX_FEE = 10000; // 1.0%
 
-/// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalites.
+/// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
 /// @dev The winner address should implement IArbiterFeeProvider to set the trading fees.
 /// @dev The winner address should be able to manage ERC6909 claim tokens in the PoolManager.
@@ -33,12 +34,6 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     using PoolIdLibrary for PoolKey;
     using SafeCast for int256;
     using SafeCast for uint256;
-
-    error InitData();
-    error NotDynamicFee();
-    error ToSmallDeposit();
-    error AlreadyWinning();
-    error RentTooLow();
 
     /// @notice State used within hooks.
     struct PoolHookState {
@@ -83,10 +78,10 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         GET_SWAP_FEE_GAS_LIMIT = _getSwapFeeGasLimit;
         RENT_IN_TOKEN_ZERO = _rentInTokenZero;
 
-        require(
-            uint16(uint160(address(this)) >> 144) == getHookPermissionsBitmap(),
-            "hookAddress mismatch"
-        );
+        // require(
+        //     uint16(uint160(address(this)) >> 144) == getHookPermissionsBitmap(),
+        //     "hookAddress mismatch"
+        // );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +89,12 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     ///////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Specify hook permissions. `beforeSwapReturnDelta` is also set to charge custom swap fees that go to the strategist instead of LPs.
-    function getHookPermissionsBitmap() public pure returns (uint16) {
+    function getHooksRegistrationBitmap()
+        external
+        pure
+        override
+        returns (uint16)
+    {
         return
             _hooksRegistrationBitmapFrom(
                 Permissions({
@@ -116,7 +116,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             );
     }
 
-    /// @dev Reverts if dynamic fee flag is not set or if the pool is not intialized with dynamic fees.
+    /// @dev Reverts if dynamic fee flag is not set or if the pool is not initialized with dynamic fees.
     function beforeInitialize(
         address,
         PoolKey calldata key,
@@ -145,7 +145,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     }
 
     /// @notice Distributes rent to LPs before each swap.
-    /// @notice Returns fee what will be paid to the hook and pays the fee to the strategist.
+    /// @notice Returns fee that will be paid to the hook and pays the fee to the strategist.
     function beforeSwap(
         address sender,
         PoolKey calldata key,
@@ -159,7 +159,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     {
         address strategy = _payRent(key);
 
-        // If no strategy is set, the swap fee is just set to the default fee Uniswap pool
+        // If no strategy is set, the swap fee is just set to the default value
         if (strategy == address(0)) {
             return (
                 this.beforeSwap.selector,
@@ -185,9 +185,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             }
         } catch {}
 
-        int256 fees = (params.amountSpecified * int256(fee)) /
-            1e6 -
-            params.amountSpecified;
+        int256 fees = (params.amountSpecified * int256(fee)) / 1e6;
         uint256 absFees = fees < 0 ? uint256(-fees) : uint256(fees);
         // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
@@ -198,7 +196,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             ? key.currency0
             : key.currency1;
 
-        // // Send fees to `feeRecipient`
+        // Send fees to `feeRecipient`
         vault.mint(strategy, feeCurrency, absFees);
 
         // Override LP fee to zero
@@ -292,23 +290,31 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function overbid(
         PoolKey calldata key,
         uint96 rent,
-        uint48 rentEndBlockNumber,
+        uint48 rentEndBlock,
         address strategy
     ) external {
-        require(
-            rentEndBlockNumber >= block.number + MINIMUM_RENT_TIME_IN_BLOCKS,
-            "Rent too short"
-        );
+        uint48 minimumEndBlock = uint48(block.number) +
+            MINIMUM_RENT_TIME_IN_BLOCKS;
+        if (rentEndBlock < minimumEndBlock) {
+            revert RentTooShort();
+        }
         (uint160 price, , , ) = poolManager.getSlot0(key.toId());
-        require(price != 0, "Pool not initialized");
+        if (price == 0) {
+            revert PoolNotInitialized();
+        }
 
         RentData memory rentData = rentDatas[key.toId()];
         PoolHookState memory hookState = poolHookStates[key.toId()];
-        if (block.number < rentData.rentEndBlock - TRANSTION_BLOCKS) {
-            require(
-                rent > (hookState.rentPerBlock * RENT_FACTOR) / 1e6,
-                "Rent too low"
+        if (
+            rentData.rentEndBlock != 0 &&
+            block.number < rentData.rentEndBlock - TRANSTION_BLOCKS
+        ) {
+            uint96 minimumRent = uint96(
+                (hookState.rentPerBlock * RENT_FACTOR) / 1e6
             );
+            if (rent <= minimumRent) {
+                revert RentTooLow();
+            }
         }
 
         _payRent(key);
@@ -319,19 +325,18 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         deposits[winners[key.toId()]][currency] += rentData.remainingRent;
 
         // charge the new winner
-        uint128 requiredDeposit = rent *
-            (rentEndBlockNumber - uint48(block.number));
+        uint128 requiredDeposit = rent * (rentEndBlock - uint48(block.number));
         unchecked {
-            require(
-                deposits[msg.sender][currency] >= requiredDeposit,
-                "Deposit too low"
-            );
-            deposits[msg.sender][currency] -= requiredDeposit;
+            uint256 availableDeposit = deposits[msg.sender][currency];
+            if (availableDeposit < requiredDeposit) {
+                revert InsufficientDeposit();
+            }
+            deposits[msg.sender][currency] = availableDeposit - requiredDeposit;
         }
 
         // set up new rent
         rentData.remainingRent = requiredDeposit;
-        rentData.rentEndBlock = rentEndBlockNumber;
+        rentData.rentEndBlock = rentEndBlock;
         rentData.shouldChangeStrategy = true;
         hookState.rentPerBlock = rent;
 
@@ -345,7 +350,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function withdraw(address asset, uint256 amount) external override {
         uint256 depositAmount = deposits[msg.sender][Currency.wrap(asset)];
         unchecked {
-            require(depositAmount >= amount, "Deposit too low");
+            if (depositAmount < amount) {
+                revert InsufficientDeposit();
+            }
             deposits[msg.sender][Currency.wrap(asset)] = depositAmount - amount;
         }
         // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
@@ -357,7 +364,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         PoolKey calldata key,
         address strategy
     ) external override {
-        require(msg.sender == winners[key.toId()], "Not winner");
+        if (msg.sender != winners[key.toId()]) {
+            revert CallerNotWinner();
+        }
         poolHookStates[key.toId()].strategy = strategy;
         rentDatas[key.toId()].shouldChangeStrategy = true;
     }
@@ -372,9 +381,11 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     ) external override vaultOnly returns (bytes memory) {
         CallbackData memory data = abi.decode(rawData, (CallbackData));
         if (data.depositAmount > 0) {
-            vault.burn(
+            vault.sync(Currency.wrap(data.currency));
+            // Transfer tokens directly from msg.sender to the vault
+            IERC20(data.currency).transferFrom(
                 data.sender,
-                Currency.wrap(data.currency),
+                address(vault),
                 data.depositAmount
             );
             vault.mint(
@@ -382,6 +393,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
                 Currency.wrap(data.currency),
                 data.depositAmount
             );
+            vault.settle();
         }
         if (data.withdrawAmount > 0) {
             vault.burn(
@@ -394,6 +406,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
                 Currency.wrap(data.currency),
                 data.withdrawAmount
             );
+            vault.settle();
         }
         return "";
     }
