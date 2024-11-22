@@ -211,25 +211,20 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
 
         bool exactOut = params.amountSpecified > 0;
-        Currency feeCurrency = exactOut == params.zeroForOne
+        Currency feeCurrency = exactOut != params.zeroForOne
             ? key.currency0
             : key.currency1;
 
         console.log("feeCurrency", Currency.unwrap(feeCurrency));
-        console.log("exactOut", exactOut);
-        console.log("params.amountSpecified", params.amountSpecified);
 
-        // Send fees to strategy
+        // Send fees to `feeRecipient`
         vault.mint(strategy, feeCurrency, absFees);
 
         // Override LP fee to zero
         console.log("beforeSwap end");
         return (
             this.beforeSwap.selector,
-            exactOut
-                ? toBeforeSwapDelta(0, int128(fees))
-                : toBeforeSwapDelta(0, -int128(fees)),
-            // toBeforeSwapDelta(0, 0),
+            toBeforeSwapDelta(int128(fees), 0),
             LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
     }
@@ -344,12 +339,12 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function overbid(
         PoolKey calldata key,
-        uint96 rentPerBlock,
+        uint96 rent,
         uint48 rentEndBlock,
         address strategy
     ) external {
         console.log("overbid start");
-        console.log("rentPerBlock", rentPerBlock);
+        console.log("rent", rent);
         console.log("rentEndBlock", rentEndBlock);
         console.log("strategy", strategy);
         uint48 minimumEndBlock = uint48(block.number) +
@@ -368,10 +363,10 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             rentData.rentEndBlock != 0 &&
             block.number < rentData.rentEndBlock - TRANSTION_BLOCKS
         ) {
-            uint96 minimumRentPerBlock = uint96(
+            uint96 minimumRent = uint96(
                 (hookState.rentPerBlock * RENT_FACTOR) / 1e6
             );
-            if (rentPerBlock <= minimumRentPerBlock) {
+            if (rent <= minimumRent) {
                 revert RentTooLow();
             }
         }
@@ -380,12 +375,11 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
 
         Currency currency = _getPoolRentCurrency(key);
 
-        // refund the remaining rentPerBlock to the previous winner
+        // refund the remaining rent to the previous winner
         deposits[winners[key.toId()]][currency] += rentData.remainingRent;
 
         // charge the new winner
-        uint128 requiredDeposit = rentPerBlock *
-            (rentEndBlock - uint48(block.number));
+        uint128 requiredDeposit = rent * (rentEndBlock - uint48(block.number));
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
             if (availableDeposit < requiredDeposit) {
@@ -398,7 +392,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         rentData.remainingRent = requiredDeposit;
         rentData.rentEndBlock = rentEndBlock;
         rentData.shouldChangeStrategy = true;
-        hookState.rentPerBlock = rentPerBlock;
+        hookState.rentPerBlock = rent;
 
         rentDatas[key.toId()] = rentData;
         poolHookStates[key.toId()] = hookState;
@@ -492,113 +486,26 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     /// @dev Must be called while lock is acquired.
     /// @param key Pool key.
     /// @return address of the strategy to be used for the next swap.
-    // function _payRent(PoolKey memory key) internal returns (address) {
-    //     console.log("_payRent start");
-    //     RentData memory rentData = rentDatas[key.toId()];
-    //     PoolHookState memory hookState = poolHookStates[key.toId()];
-    //     console.log("rentData.lastPaidBlock", rentData.lastPaidBlock);
-    //     console.log("rentData.rentEndBlock", rentData.rentEndBlock);
-    //     console.log("hookState.strategy", hookState.strategy);
-    //     console.log("hookState.rentPerBlock", hookState.rentPerBlock);
-
-    //     bool alreadyPaidThisBlock = rentData.lastPaidBlock == block.number;
-    //     bool lastPaidBlockMarkedAtOrAfterRentFinished = rentData
-    //         .lastPaidBlock >= rentData.rentEndBlock;
-
-    //     bool triggerPayment = true;
-    //     if (
-    //         (alreadyPaidThisBlock || lastPaidBlockMarkedAtOrAfterRentFinished)
-    //     ) {
-    //         console.log("triggerPayment false");
-    //         triggerPayment = false;
-    //     }
-
-    //     bool hookStateChanged = false;
-
-    //     if (triggerPayment) {
-    //         uint48 blocksElapsed;
-    //         if (rentData.rentEndBlock <= uint48(block.number)) {
-    //             blocksElapsed = rentData.rentEndBlock - rentData.lastPaidBlock;
-
-    //             winners[key.toId()] = address(0);
-    //             winnerStrategies[key.toId()] = address(0);
-    //             rentData.shouldChangeStrategy = true;
-    //             hookState.rentPerBlock = 0;
-    //             hookStateChanged = true;
-
-    //             console.log("Rent period ended, resetting winner and strategy");
-    //         } else {
-    //             blocksElapsed = uint48(block.number) - rentData.lastPaidBlock;
-    //         }
-
-    //         // pay the rent
-    //         Currency currency = _getPoolRentCurrency(key);
-    //         uint128 rentAmount = hookState.rentPerBlock * blocksElapsed;
-    //         vault.burn(address(this), currency, rentAmount);
-
-    //         console.log("blocksElapsed", blocksElapsed);
-    //         console.log("rentAmount", rentAmount);
-    //         console.log(
-    //             "Paying rentAmount",
-    //             rentAmount,
-    //             "in currency",
-    //             Currency.unwrap(currency)
-    //         );
-
-    //         if (RENT_IN_TOKEN_ZERO) {
-    //             poolManager.donate(key, rentAmount, 0, "");
-    //         } else {
-    //             poolManager.donate(key, 0, rentAmount, "");
-    //         }
-
-    //         rentData.remainingRent -= rentAmount;
-    //         rentData.lastPaidBlock = uint48(block.number);
-    //         rentDatas[key.toId()] = rentData;
-    //     }
-
-    //     // check if we need to change strategy (due to the above logic/overbid/changeStrategy)
-    //     if (rentData.shouldChangeStrategy) {
-    //         rentData.shouldChangeStrategy = false;
-    //         hookState.strategy = winnerStrategies[key.toId()];
-    //         hookStateChanged = true;
-    //         console.log("Strategy changed to", hookState.strategy);
-    //     }
-
-    //     if (hookStateChanged) {
-    //         poolHookStates[key.toId()] = hookState;
-    //     }
-
-    //     console.log("_payRent end");
-    //     return hookState.strategy;
-    // }
-
     function _payRent(PoolKey memory key) internal returns (address) {
         console.log("_payRent start");
         RentData memory rentData = rentDatas[key.toId()];
         PoolHookState memory hookState = poolHookStates[key.toId()];
-        console.log("block number", block.number);
         console.log("rentData.lastPaidBlock", rentData.lastPaidBlock);
         console.log("rentData.rentEndBlock", rentData.rentEndBlock);
         console.log("hookState.strategy", hookState.strategy);
         console.log("hookState.rentPerBlock", hookState.rentPerBlock);
-        console.log("Remaining rent", rentData.remainingRent);
 
-        if (rentData.lastPaidBlock == block.number) {
-            console.log("rentData.lastPaidBlock == block.number");
-            return hookState.strategy;
-        }
-
-        if (rentData.lastPaidBlock >= rentData.rentEndBlock) {
-            rentData.lastPaidBlock = uint48(block.number);
-            rentDatas[key.toId()] = rentData;
-            console.log("rentData.lastPaidBlock >= rentData.rentEndBlock");
+        if (
+            (rentData.lastPaidBlock == block.number ||
+                rentData.lastPaidBlock >= rentData.rentEndBlock)
+        ) {
+            console.log("_payRent end (early return)");
             return hookState.strategy;
         }
 
         bool hookStateChanged = false;
         // check if we need to change strategy
         if (rentData.shouldChangeStrategy) {
-            console.log("rentData.shouldChangeStrategy");
             hookState.strategy = winnerStrategies[key.toId()];
             rentData.shouldChangeStrategy = false;
             hookStateChanged = true;
@@ -618,34 +525,34 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             blocksElapsed = uint48(block.number) - rentData.lastPaidBlock;
         }
 
+        console.log("blocksElapsed", blocksElapsed);
+
         rentData.lastPaidBlock = uint48(block.number);
 
         uint128 rentAmount = hookState.rentPerBlock * blocksElapsed;
+
+        console.log("rentAmount", rentAmount);
 
         rentData.remainingRent -= rentAmount;
 
         if (rentAmount != 0) {
             // pay the rent
             Currency currency = _getPoolRentCurrency(key);
-
-            vault.burn(address(this), currency, rentAmount);
-            poolManager.donate(key, rentAmount, 0, "");
-
-            console.log("blocksElapsed", blocksElapsed);
-            console.log("rentAmount", rentAmount);
             console.log(
                 "Paying rentAmount",
                 rentAmount,
                 "in currency",
                 Currency.unwrap(currency)
             );
+
+            vault.burn(address(this), currency, rentAmount);
+            poolManager.donate(key, rentAmount, 0, "");
         }
 
         rentDatas[key.toId()] = rentData;
         if (hookStateChanged) {
             poolHookStates[key.toId()] = hookState;
         }
-        console.log("Remaining rent after", rentData.remainingRent);
 
         console.log("_payRent end");
         return hookState.strategy;

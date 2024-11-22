@@ -49,6 +49,10 @@ contract MockStrategy is IArbiterFeeProvider {
     ) external view returns (uint24) {
         return fee;
     }
+
+    function setFee(uint24 _fee) external {
+        fee = _fee;
+    }
 }
 
 contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
@@ -110,36 +114,53 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             type(uint256).max
         );
         // Add liquidity
-        addLiquidity(key, 1 ether, 1 ether, -60, 60, address(this));
+        addLiquidity(key, 10 ether, 10 ether, -60, 60, address(this));
+
+        console.log("currency0: ", address(Currency.unwrap(currency0)));
+        console.log("currency1: ", address(Currency.unwrap(currency1)));
+        console.log("user1", user1);
+        // console.log("user2", user2);
+        console.log("this", address(this));
+        console.log("vault", address(vault));
+        console.log("universalRouter", address(universalRouter));
+        console.log("arbiterHook", address(arbiterHook));
     }
 
-    function testBiddingAndRentPayment() public {
-        currency0.transfer(user1, 1000e18);
+    function transferToUser1AndDepositAs(uint256 amount) public {
+        currency0.transfer(user1, amount);
         vm.startPrank(user1);
         IERC20(Currency.unwrap(currency0)).approve(
             address(arbiterHook),
-            1000e18
+            amount
         );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
+        arbiterHook.deposit(Currency.unwrap(currency0), amount);
         vm.stopPrank();
+    }
+
+    function testBiddingAndRentPayment() public {
+        transferToUser1AndDepositAs(1000e18);
 
         // User1 overbids
         vm.prank(user1);
         arbiterHook.overbid(
             key,
-            10e18, // rent per block
-            uint48(block.number + 20), // rent end block
+            10e18,
+            uint48(block.number + 20),
             address(0) // strategy (none)
         );
 
         address winner = arbiterHook.winner(key);
-        assertEq(winner, user1);
+        assertEq(winner, user1, "Winner should be user1 after overbidding");
 
         // Simulate some blocks passing
         vm.roll(block.number + 5);
 
         (uint128 remainingRent, , , , ) = arbiterHook.rentDatas(id);
-        assertLt(remainingRent, 1000e18);
+        assertLt(
+            remainingRent,
+            1000e18,
+            "Remaining rent should be less than initial deposit"
+        );
 
         // add liquidity
         addLiquidity(key, 1, 1, -60, 60, address(this));
@@ -147,23 +168,18 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         // TODO: test rent payment
     }
 
-    function testStrategyFeeAdjustment() public {
+    function testStrategyContractSetsFee() public {
         // Deploy a mock strategy that sets swap fee to MAX_FEE
         MockStrategy strategy = new MockStrategy(MAX_FEE);
 
         // User1 deposits and overbids with the strategy
-        currency0.transfer(user1, 1000e18);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
 
         arbiterHook.overbid(
             key,
-            10e18, // rent per block
-            uint48(block.number + 20), // rent end block
+            10e18,
+            uint48(block.number + 20),
             address(strategy)
         );
         vm.stopPrank();
@@ -171,14 +187,27 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 prevBalance0 = key.currency0.balanceOf(address(this));
         uint256 prevBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 prevPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 prevPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
+        uint128 amountIn = 1e18;
+
+        permit2Approve(address(this), currency0, address(universalRouter));
+        permit2Approve(address(this), currency1, address(universalRouter));
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(universalRouter),
+            1000e18
         );
 
-        uint128 amountIn = 1e18;
+        IERC20(Currency.unwrap(currency1)).approve(
+            address(universalRouter),
+            1000e18
+        );
+
+        permit2Approve(address(this), currency0, address(vault));
+        permit2Approve(address(this), currency1, address(vault));
+
+        IERC20(Currency.unwrap(currency0)).approve(address(vault), 1000e18);
+
+        IERC20(Currency.unwrap(currency1)).approve(address(vault), 1000e18);
 
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
@@ -193,25 +222,30 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 postPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 postPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
-
         uint256 expectedFeeAmount = (amountIn * MAX_FEE) / 1e6;
 
-        assertEq(prevBalance0 - postBalance0, amountIn);
+        assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
-        assertEq(poolManager.protocolFeesAccrued(key.currency0), 0);
-        assertEq(poolManager.protocolFeesAccrued(key.currency0), 0);
+        assertEq(
+            poolManager.protocolFeesAccrued(key.currency0),
+            0,
+            "Protocol fees accrued in currency0 should be zero"
+        );
+        assertEq(
+            poolManager.protocolFeesAccrued(key.currency0),
+            0,
+            "Protocol fees accrued in currency0 should be zero"
+        );
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency0
+            key.currency1
         );
-        assertEq(strategyBalance, expectedFeeAmount);
+        assertEq(
+            strategyBalance,
+            expectedFeeAmount,
+            "Strategy balance does not match expected fee amount"
+        );
     }
 
     function testStrategyFeeCappedAtMaxFee() public {
@@ -219,18 +253,13 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint24 strategyFee = MAX_FEE + 1000; // Fee greater than MAX_FEE
         MockStrategy strategy = new MockStrategy(strategyFee);
 
-        currency0.transfer(user1, 1000e18);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
+        transferToUser1AndDepositAs(1000e18);
 
+        vm.startPrank(user1);
         arbiterHook.overbid(
             key,
-            10e18, // Rent per block
-            uint48(block.number + 20), // Rent end block
+            10e18,
+            uint48(block.number + 20),
             address(strategy)
         );
         vm.stopPrank();
@@ -238,13 +267,6 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         // Record initial balances
         uint256 prevBalance0 = key.currency0.balanceOf(address(this));
         uint256 prevBalance1 = key.currency1.balanceOf(address(this));
-
-        uint256 prevPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 prevPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
 
         // Perform a swap
         uint128 amountIn = 1e18;
@@ -262,52 +284,49 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 postPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 postPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
-
         uint256 expectedFeeAmount = (amountIn * MAX_FEE) / 1e6;
 
-        assertEq(prevBalance0 - postBalance0, amountIn);
+        assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
-        uint256 expectedPoolToken0Increase = amountIn - expectedFeeAmount;
-
-        assertEq(
-            postPoolBalance0 - prevPoolBalance0,
-            expectedPoolToken0Increase
+        uint256 strategyBalance = vault.balanceOf(
+            address(strategy),
+            key.currency1
         );
-
-        uint256 strategyBalance = key.currency0.balanceOf(address(strategy));
-        assertEq(strategyBalance, expectedFeeAmount);
+        assertEq(
+            strategyBalance,
+            expectedFeeAmount,
+            "Strategy balance should match expected fee amount"
+        );
     }
 
     function testDepositAndWithdraw() public {
         // User1 deposits currency0
-        currency0.transfer(user1, 100e18);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            100e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 100e18);
+
+        transferToUser1AndDepositAs(100e18);
 
         uint256 depositBalance = arbiterHook.depositOf(
             Currency.unwrap(currency0),
             user1
         );
-        assertEq(depositBalance, 100e18);
+        assertEq(
+            depositBalance,
+            100e18,
+            "Deposit amount does not match expected value"
+        );
 
         // User1 withdraws half
+        vm.startPrank(user1);
         arbiterHook.withdraw(Currency.unwrap(currency0), 50e18);
 
         depositBalance = arbiterHook.depositOf(
             Currency.unwrap(currency0),
             user1
         );
-        assertEq(depositBalance, 50e18);
+        assertEq(
+            depositBalance,
+            50e18,
+            "Deposit balance should be 50e18 after withdrawing half"
+        );
 
         // withdraws the rest
         arbiterHook.withdraw(Currency.unwrap(currency0), 50e18);
@@ -315,20 +334,19 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             Currency.unwrap(currency0),
             user1
         );
-        assertEq(depositBalance, 0);
+        assertEq(
+            depositBalance,
+            0,
+            "Deposit balance should be zero after withdrawing all"
+        );
 
         vm.stopPrank();
     }
 
     function testChangeStrategy() public {
         // User1 overbids and becomes the winner
-        currency0.transfer(user1, 1000e18);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
         arbiterHook.overbid(key, 10e18, uint48(block.number + 20), address(0));
         vm.stopPrank();
 
@@ -338,7 +356,11 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         arbiterHook.changeStrategy(key, address(newStrategy));
 
         address currentStrategy = arbiterHook.activeStrategy(key);
-        assertEq(currentStrategy, address(newStrategy));
+        assertEq(
+            currentStrategy,
+            address(newStrategy),
+            "Active strategy should be updated to new strategy"
+        );
     }
 
     function testRevertIfNotDynamicFee() public {
@@ -367,40 +389,18 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
     function testRentTooLow() public {
         // User1 deposits currency0
-        currency0.transfer(user1, 1000e18);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
-        vm.stopPrank();
+        transferToUser1AndDepositAs(1000e18);
 
         vm.prank(user1);
-        arbiterHook.overbid(
-            key,
-            1e18, // rent per block
-            uint48(block.number + 20),
-            address(0)
-        );
+        arbiterHook.overbid(key, 1e18, uint48(block.number + 20), address(0));
         vm.expectRevert(IArbiterAmAmmHarbergerLease.RentTooLow.selector);
-        arbiterHook.overbid(
-            key,
-            1e18, // rent per block (too low)
-            uint48(block.number + 20),
-            address(0)
-        );
+        arbiterHook.overbid(key, 1e18, uint48(block.number + 20), address(0));
     }
 
     function testNotWinnerCannotChangeStrategy() public {
         // User1 overbids and becomes the winner
-        currency0.transfer(user1, 1000e18);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
         arbiterHook.overbid(key, 10e18, uint48(block.number + 20), address(0));
         vm.stopPrank();
 
@@ -414,22 +414,30 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         // Ensure there is no winner and no strategy set
         address currentWinner = arbiterHook.winner(key);
         address currentStrategy = arbiterHook.activeStrategy(key);
-        assertEq(currentWinner, address(0));
-        assertEq(currentStrategy, address(1)); // Initial strategy is set to address(1)
+        assertEq(
+            currentWinner,
+            address(0),
+            "Initial winner should be address(0)"
+        );
+        assertEq(
+            currentStrategy,
+            address(0),
+            "Initial strategy should be address(0)"
+        );
+
+        uint128 amountIn = 1e18;
+        currency0.transfer(user1, 1000e18);
 
         // Record initial balances
-        uint256 prevBalance0 = key.currency0.balanceOf(address(this));
-        uint256 prevBalance1 = key.currency1.balanceOf(address(this));
+        uint256 prevBalance0 = key.currency0.balanceOf(address(user1));
+        uint256 prevBalance1 = key.currency1.balanceOf(address(user1));
 
-        uint256 prevPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 prevPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
+        assertEq(prevBalance0, 1000e18, "Initial balance0 mismatch");
+        assertEq(prevBalance1, 0, "Initial balance1 mismatch");
 
         // Perform a swap
-        uint128 amountIn = 1e18;
+        permit2Approve(user1, currency0, address(universalRouter));
+        vm.startPrank(user1);
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
                 poolKey: key,
@@ -439,56 +447,39 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
                 hookData: ZERO_BYTES
             })
         );
+        vm.stopPrank();
 
         // Record final balances
-        uint256 postBalance0 = key.currency0.balanceOf(address(this));
-        uint256 postBalance1 = key.currency1.balanceOf(address(this));
-
-        uint256 postPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 postPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
+        uint256 postBalance0 = key.currency0.balanceOf(address(user1));
+        uint256 postBalance1 = key.currency1.balanceOf(address(user1));
 
         // Calculate the expected fee using DEFAULT_SWAP_FEE
         uint256 expectedFeeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
 
-        assertEq(prevBalance0 - postBalance0, amountIn);
+        assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
-        // The amount that should have been added to the pool is amountIn minus the fee
-        uint256 expectedPoolToken0Increase = amountIn - expectedFeeAmount;
-
-        assertEq(
-            postPoolBalance0 - prevPoolBalance0,
-            expectedPoolToken0Increase
+        uint256 strategyBalance = vault.balanceOf(
+            address(currentStrategy),
+            key.currency1
         );
-
-        uint256 strategyBalance = key.currency0.balanceOf(address(0));
-        assertEq(strategyBalance, 0);
+        assertEq(
+            strategyBalance,
+            0,
+            "Strategy balance should be zero when no one has won"
+        );
     }
 
-    function testDefaultFeeAfterAuctionExpired() public {
+    function testDefaultFeeAfterAuctionWinExpired() public {
         // Deploy a mock strategy that sets swap fee to MAX_FEE
         MockStrategy strategy = new MockStrategy(MAX_FEE);
 
         // User1 deposits and overbids with the strategy
-        currency0.transfer(user1, 1000e18);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            1000e18
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), 1000e18);
 
         // Set rent to expire in 20 blocks
         uint48 rentEndBlock = uint48(block.number + 20);
-        arbiterHook.overbid(
-            key,
-            10e18, // Rent per block
-            rentEndBlock, // Rent end block
-            address(strategy)
-        );
+        arbiterHook.overbid(key, 10e18, rentEndBlock, address(strategy));
         vm.stopPrank();
 
         vm.roll(block.number + 21);
@@ -501,13 +492,6 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 prevBalance0 = key.currency0.balanceOf(address(this));
         uint256 prevBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 prevPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 prevPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
-
         // Perform a swap
         uint128 amountIn = 1e18;
         exactInputSingle(
@@ -520,35 +504,52 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             })
         );
 
+        //trigger _payRent
+        console.log("triggering _payRent");
+        addLiquidity(key, 1, 1, -60, 60, address(this));
+
         address currentWinner = arbiterHook.winner(key);
         address currentStrategy = arbiterHook.activeStrategy(key);
-        assertEq(currentWinner, address(0));
-        assertEq(currentStrategy, address(0));
+        assertEq(
+            currentWinner,
+            address(0),
+            "Winner should be reset to address(0) after rent expiry"
+        );
+        assertEq(
+            currentStrategy,
+            address(0),
+            "Strategy should be reset to address(0) after rent expiry"
+        );
 
         // Record final balances
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 postPoolBalance0 = key.currency0.balanceOf(
-            address(poolManager)
-        );
-        uint256 postPoolBalance1 = key.currency1.balanceOf(
-            address(poolManager)
-        );
-
         uint256 expectedFeeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
 
-        assertEq(prevBalance0 - postBalance0, amountIn);
+        console.log("prevBalance0: ", prevBalance0);
+        console.log("postBalance0: ", postBalance0);
+        console.log("amountIn: ", amountIn);
+        console.log("expectedFeeAmount: ", expectedFeeAmount);
+
+        assertApproxEqRel(
+            prevBalance0 - postBalance0,
+            amountIn,
+            1,
+            "Amount in mismatch"
+        );
 
         uint256 expectedPoolToken0Increase = amountIn - expectedFeeAmount;
 
-        assertEq(
-            postPoolBalance0 - prevPoolBalance0,
-            expectedPoolToken0Increase
+        uint256 strategyBalance = vault.balanceOf(
+            address(currentStrategy),
+            key.currency1
         );
-
-        uint256 strategyBalance = key.currency0.balanceOf(address(strategy));
-        assertEq(strategyBalance, 0);
+        assertEq(
+            strategyBalance,
+            0,
+            "Strategy balance should be zero after rent expiry"
+        );
     }
 
     function testDepositOf() public {
@@ -558,15 +559,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
         assertEq(initialDeposit, 0, "Initial deposit should be zero");
 
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
-        vm.stopPrank();
+        transferToUser1AndDepositAs(1000e18);
 
         uint256 postDeposit = arbiterHook.depositOf(
             Currency.unwrap(currency0),
@@ -574,7 +567,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
         assertEq(
             postDeposit,
-            depositAmount,
+            1000e18,
             "Deposit amount does not match expected value"
         );
     }
@@ -593,19 +586,13 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         address initialStrategy = arbiterHook.activeStrategy(key);
         assertEq(
             initialStrategy,
-            address(1),
-            "Initial active strategy should be address(1)"
+            address(0),
+            "Initial active strategy should be address(0)"
         );
 
         MockStrategy strategy = new MockStrategy(MAX_FEE);
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
 
         arbiterHook.overbid(
             key,
@@ -616,16 +603,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         vm.stopPrank();
 
         // Trigger _payRent
-        uint128 amountIn = 1e18;
-        exactInputSingle(
-            ICLRouterBase.CLSwapExactInputSingleParams({
-                poolKey: key,
-                zeroForOne: true,
-                amountIn: amountIn,
-                amountOutMinimum: 0,
-                hookData: ZERO_BYTES
-            })
-        );
+        addLiquidity(key, 1, 1, -60, 60, address(this));
 
         address updatedStrategy = arbiterHook.activeStrategy(key);
         assertEq(
@@ -644,15 +622,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(MAX_FEE);
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
 
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
         arbiterHook.overbid(
             key,
             10e18,
@@ -678,14 +651,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(MAX_FEE);
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
+
+        transferToUser1AndDepositAs(1000e18);
+
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
 
         arbiterHook.overbid(
             key,
@@ -704,14 +673,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         assertEq(initialRentPerBlock, 0, "Initial rentPerBlock should be zero");
 
         MockStrategy strategy = new MockStrategy(MAX_FEE);
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
+        transferToUser1AndDepositAs(1000e18);
         vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
 
         arbiterHook.overbid(
             key,
@@ -753,15 +716,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         uint48 desiredRentEndBlock = uint48(block.number + 20);
         MockStrategy strategy = new MockStrategy(MAX_FEE);
-        uint256 depositAmount = 1000e18;
-        currency0.transfer(user1, depositAmount);
-        vm.startPrank(user1);
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(arbiterHook),
-            depositAmount
-        );
-        arbiterHook.deposit(Currency.unwrap(currency0), depositAmount);
 
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
         arbiterHook.overbid(key, 10e18, desiredRentEndBlock, address(strategy));
         vm.stopPrank();
 
@@ -770,6 +728,246 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             currentRentEndBlock,
             desiredRentEndBlock,
             "rentEndBlock was not set correctly"
+        );
+    }
+
+    function testExactOutZeroForOne() public {
+        uint24 fee = 1000;
+        MockStrategy strategy = new MockStrategy(fee);
+
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + 20),
+            address(strategy)
+        );
+        vm.stopPrank();
+
+        uint128 amountOut = 1e18;
+        exactOutputSingle(
+            ICLRouterBase.CLSwapExactOutputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountOut: amountOut,
+                amountInMaximum: 2e18,
+                hookData: ZERO_BYTES
+            })
+        );
+    }
+    function testExactOutOneForZero() public {
+        uint24 fee = 1000;
+        MockStrategy strategy = new MockStrategy(fee);
+
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + 20),
+            address(strategy)
+        );
+        vm.stopPrank();
+
+        uint128 amountOut = 1e18;
+        exactOutputSingle(
+            ICLRouterBase.CLSwapExactOutputSingleParams({
+                poolKey: key,
+                zeroForOne: false,
+                amountOut: amountOut,
+                amountInMaximum: 2e18,
+                hookData: ZERO_BYTES
+            })
+        );
+    }
+
+    function testExactInZeroForOne() public {
+        uint24 fee = 1000;
+        MockStrategy strategy = new MockStrategy(fee);
+
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + 20),
+            address(strategy)
+        );
+        vm.stopPrank();
+
+        uint128 amountIn = 1e18;
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+    }
+
+    function testExactInOneForZero() public {
+        uint24 fee = 1000;
+        MockStrategy strategy = new MockStrategy(fee);
+
+        transferToUser1AndDepositAs(1000e18);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + 20),
+            address(strategy)
+        );
+        vm.stopPrank();
+
+        uint128 amountIn = 1e18;
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: false,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+    }
+
+    function testWinnerCanChangeFeeAndSwapReflects() public {
+        uint24 initialFee = 1000;
+        uint24 updatedFee = 2000;
+        MockStrategy strategy = new MockStrategy(initialFee);
+
+        transferToUser1AndDepositAs(1000e18);
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + 20),
+            address(strategy)
+        );
+        vm.stopPrank();
+
+        strategy.setFee(updatedFee);
+
+        // Perform a swap
+        uint128 amountIn = 1e18;
+        uint128 expectedFeeAmount = (amountIn * updatedFee) / 1e6;
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        // Assert
+        uint256 strategyBalance = vault.balanceOf(
+            address(strategy),
+            key.currency1
+        );
+        assertEq(
+            strategyBalance,
+            expectedFeeAmount,
+            "Strategy balance should reflect updated fee"
+        );
+    }
+
+    /// test executing 3 swaps, after each checks remainingRent decreasing appropriately (calling via remainingRent)
+    function testRemainingRentDecreases() public {
+        // User1 deposits currency0
+        transferToUser1AndDepositAs(1000e18);
+
+        // User1 overbids
+        vm.prank(user1);
+        console.log("current block", block.number);
+        console.log("rent end block", uint48(block.number + 50));
+        arbiterHook.overbid(key, 10e18, uint48(block.number + 50), address(0));
+
+        vm.roll(block.number + 10);
+
+        // 1st swap
+        uint128 amountIn = 1e18;
+
+        uint128 expectedDonate = 10e18 * 10;
+        // vm.expectEmit(true, true, false, true);
+        // vm.expectEmit();
+        // emit ICLPoolManager.Donate(
+        //     key.toId(),
+        //     address(universalRouter),
+        //     expectedDonate,
+        //     0,
+        //     0
+        // );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        // Check remaining rent
+        (uint128 remainingRent, , , , ) = arbiterHook.rentDatas(id);
+        assertLt(
+            remainingRent,
+            1000e18,
+            "Remaining rent should be less than initial deposit"
+        );
+
+        // 2nd swap
+        vm.roll(block.number + 20);
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        // Check remaining rent
+        (uint128 remainingRent2, , , , ) = arbiterHook.rentDatas(id);
+        assertLt(
+            remainingRent2,
+            remainingRent,
+            "Remaining rent should be less than previous remaining rent 1"
+        );
+
+        // assertEq(1000e18, remainingRent - expectedDonate, "Remaining rent should be 1000e18");
+
+        // 3rd swap
+        vm.roll(block.number + 30);
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        // Check remaining rent
+        (uint128 remainingRent3, , , , ) = arbiterHook.rentDatas(id);
+        assertLt(
+            remainingRent3,
+            remainingRent2,
+            "Remaining rent should be less than previous remaining rent 2"
         );
     }
 }
