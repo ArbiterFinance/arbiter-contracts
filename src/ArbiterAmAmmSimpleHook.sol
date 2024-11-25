@@ -72,18 +72,21 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         uint256 _getSwapFeeGasLimit,
         bool _rentInTokenZero
     ) CLBaseHook(_poolManager) {
-        console.log("Constructor start");
-        console.log("_minimumRentTimeInBlocks", _minimumRentTimeInBlocks);
-        console.log("_rentFactor", _rentFactor);
-        console.log("_transitionBlocks", _transitionBlocks);
-        console.log("_getSwapFeeGasLimit", _getSwapFeeGasLimit);
-        console.log("_rentInTokenZero", _rentInTokenZero);
+        console.log("[Constructor] Constructor start");
+        console.log(
+            "[Constructor] _minimumRentTimeInBlocks",
+            _minimumRentTimeInBlocks
+        );
+        console.log("[Constructor] _rentFactor", _rentFactor);
+        console.log("[Constructor] _transitionBlocks", _transitionBlocks);
+        console.log("[Constructor] _getSwapFeeGasLimit", _getSwapFeeGasLimit);
+        console.log("[Constructor] _rentInTokenZero", _rentInTokenZero);
         MINIMUM_RENT_TIME_IN_BLOCKS = _minimumRentTimeInBlocks;
         RENT_FACTOR = _rentFactor;
         TRANSTION_BLOCKS = _transitionBlocks;
         GET_SWAP_FEE_GAS_LIMIT = _getSwapFeeGasLimit;
         RENT_IN_TOKEN_ZERO = _rentInTokenZero;
-        console.log("Constructor end");
+        console.log("[Constructor] Constructor end");
 
         // require(
         //     uint16(uint160(address(this)) >> 144) == getHookPermissionsBitmap(),
@@ -129,7 +132,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         PoolKey calldata key,
         uint160
     ) external override poolManagerOnly returns (bytes4) {
-        console.log("beforeInitialize start");
+        console.log("[beforeInitialize] beforeInitialize start");
         // Pool must have dynamic fee flag set. This is so we can override the LP fee in `beforeSwap`.
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
 
@@ -137,7 +140,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             strategy: address(0),
             rentPerBlock: 0
         });
-        console.log("beforeInitialize end");
+        console.log("[beforeInitialize] beforeInitialize end");
         return this.beforeInitialize.selector;
     }
 
@@ -148,9 +151,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external override poolManagerOnly returns (bytes4) {
-        console.log("beforeAddLiquidity start");
+        console.log("[beforeAddLiquidity] beforeAddLiquidity start");
         _payRent(key);
-        console.log("beforeAddLiquidity end");
+        console.log("[beforeAddLiquidity] beforeAddLiquidity end");
         return this.beforeAddLiquidity.selector;
     }
 
@@ -167,14 +170,14 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         poolManagerOnly
         returns (bytes4, BeforeSwapDelta, uint24)
     {
-        console.log("beforeSwap start");
+        console.log("[beforeSwap] beforeSwap start");
         address strategy = _payRent(key);
 
         // If no strategy is set, the swap fee is just set to the default value
-        console.log("setting fee strategy");
+        console.log("[beforeSwap] setting fee strategy");
         if (strategy == address(0)) {
-            console.log("no strategy - setting default fee");
-            console.log("beforeSwap end");
+            console.log("[beforeSwap] no strategy - setting default fee");
+            console.log("[beforeSwap] beforeSwap end");
             return (
                 this.beforeSwap.selector,
                 toBeforeSwapDelta(0, 0),
@@ -198,14 +201,14 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
                 fee = _fee;
             }
         } catch {}
-        console.log("after strategy call");
-        console.log("fee", fee);
+        console.log("[beforeSwap] after strategy call");
+        console.log("[beforeSwap] fee", fee);
 
         int256 fees = (params.amountSpecified * int256(fee)) / 1e6;
         uint256 absFees = fees < 0 ? uint256(-fees) : uint256(fees);
 
-        console.log("fees", fees);
-        console.log("absFees", absFees);
+        console.log("[beforeSwap] fees", fees);
+        console.log("[beforeSwap] absFees", absFees);
 
         // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
@@ -215,15 +218,18 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             ? key.currency0
             : key.currency1;
 
-        console.log("feeCurrency", Currency.unwrap(feeCurrency));
-        console.log("exactOut", exactOut);
-        console.log("params.amountSpecified", params.amountSpecified);
+        console.log("[beforeSwap] feeCurrency", Currency.unwrap(feeCurrency));
+        console.log("[beforeSwap] exactOut", exactOut);
+        console.log(
+            "[beforeSwap] params.amountSpecified",
+            params.amountSpecified
+        );
 
         // Send fees to strategy
         vault.mint(strategy, feeCurrency, absFees);
 
         // Override LP fee to zero
-        console.log("beforeSwap end");
+        console.log("[beforeSwap] beforeSwap end");
         return (
             this.beforeSwap.selector,
             exactOut
@@ -255,18 +261,18 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         address asset,
         address account
     ) external view override returns (uint256) {
-        console.log("depositOf start");
+        console.log("[depositOf] depositOf start");
         uint256 depositAmount = deposits[account][Currency.wrap(asset)];
-        console.log("depositOf end");
+        console.log("[depositOf] depositOf end");
         return depositAmount;
     }
 
     function _getPoolRentCurrency(
         PoolKey memory key
     ) internal view returns (Currency) {
-        console.log("_getPoolRentCurrency start");
+        console.log("[_getPoolRentCurrency] _getPoolRentCurrency start");
         Currency currency = RENT_IN_TOKEN_ZERO ? key.currency0 : key.currency1;
-        console.log("_getPoolRentCurrency end");
+        console.log("[_getPoolRentCurrency] _getPoolRentCurrency end");
         return currency;
     }
 
@@ -274,9 +280,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function biddingCurrency(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("biddingCurrency start");
+        console.log("[biddingCurrency] biddingCurrency start");
         address currency = Currency.unwrap(_getPoolRentCurrency(key));
-        console.log("biddingCurrency end");
+        console.log("[biddingCurrency] biddingCurrency end");
         return currency;
     }
 
@@ -284,9 +290,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function activeStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("activeStrategy start");
+        console.log("[activeStrategy] activeStrategy start");
         address strategy = poolHookStates[key.toId()].strategy;
-        console.log("activeStrategy end");
+        console.log("[activeStrategy] activeStrategy end");
         return strategy;
     }
 
@@ -294,9 +300,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function winnerStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("winnerStrategy start");
+        console.log("[winnerStrategy] winnerStrategy start");
         address strategy = winnerStrategies[key.toId()];
-        console.log("winnerStrategy end");
+        console.log("[winnerStrategy] winnerStrategy end");
         return strategy;
     }
 
@@ -304,9 +310,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function winner(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("winner start");
+        console.log("[winner] winner start");
         address winnerAddr = winners[key.toId()];
-        console.log("winner end");
+        console.log("[winner] winner end");
         return winnerAddr;
     }
 
@@ -314,9 +320,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function rentPerBlock(
         PoolKey calldata key
     ) external view override returns (uint96) {
-        console.log("rentPerBlock start");
+        console.log("[rentPerBlock] rentPerBlock start");
         uint96 rent = poolHookStates[key.toId()].rentPerBlock;
-        console.log("rentPerBlock end");
+        console.log("[rentPerBlock] rentPerBlock end");
         return rent;
     }
 
@@ -324,21 +330,21 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function rentEndBlock(
         PoolKey calldata key
     ) external view override returns (uint48) {
-        console.log("rentEndBlock start");
+        console.log("[rentEndBlock] rentEndBlock start");
         uint48 endBlock = rentDatas[key.toId()].rentEndBlock;
-        console.log("rentEndBlock end");
+        console.log("[rentEndBlock] rentEndBlock end");
         return endBlock;
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
-        console.log("deposit start");
-        console.log("asset", asset);
-        console.log("amount", amount);
+        console.log("[deposit] deposit start");
+        console.log("[deposit] asset", asset);
+        console.log("[deposit] amount", amount);
         // Deposit 6909 claim tokens to Uniswap V4 PoolManager. The claim tokens are owned by this contract.
         vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
         deposits[msg.sender][Currency.wrap(asset)] += amount;
-        console.log("deposit end");
+        console.log("[deposit] deposit end");
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -348,10 +354,10 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         uint48 rentEndBlock,
         address strategy
     ) external {
-        console.log("overbid start");
-        console.log("rentPerBlock", rentPerBlock);
-        console.log("rentEndBlock", rentEndBlock);
-        console.log("strategy", strategy);
+        console.log("[overbid] overbid start");
+        console.log("[overbid] rentPerBlock", rentPerBlock);
+        console.log("[overbid] rentEndBlock", rentEndBlock);
+        console.log("[overbid] strategy", strategy);
         uint48 minimumEndBlock = uint48(block.number) +
             MINIMUM_RENT_TIME_IN_BLOCKS;
         if (rentEndBlock < minimumEndBlock) {
@@ -404,14 +410,14 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         poolHookStates[key.toId()] = hookState;
         winners[key.toId()] = msg.sender;
         winnerStrategies[key.toId()] = strategy;
-        console.log("overbid end");
+        console.log("[overbid] overbid end");
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function withdraw(address asset, uint256 amount) external override {
-        console.log("withdraw start");
-        console.log("asset", asset);
-        console.log("amount", amount);
+        console.log("[withdraw] withdraw start");
+        console.log("[withdraw] asset", asset);
+        console.log("[withdraw] amount", amount);
         uint256 depositAmount = deposits[msg.sender][Currency.wrap(asset)];
         unchecked {
             if (depositAmount < amount) {
@@ -421,7 +427,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         }
         // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
         vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
-        console.log("withdraw end");
+        console.log("[withdraw] withdraw end");
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -429,13 +435,13 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         PoolKey calldata key,
         address strategy
     ) external override {
-        console.log("changeStrategy start");
+        console.log("[changeStrategy] changeStrategy start");
         if (msg.sender != winners[key.toId()]) {
             revert CallerNotWinner();
         }
         poolHookStates[key.toId()].strategy = strategy;
         rentDatas[key.toId()].shouldChangeStrategy = true;
-        console.log("changeStrategy end");
+        console.log("[changeStrategy] changeStrategy end");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -446,12 +452,12 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     function lockAcquired(
         bytes calldata rawData
     ) external override vaultOnly returns (bytes memory) {
-        console.log("lockAcquired start");
+        console.log("[lockAcquired] lockAcquired start");
         CallbackData memory data = abi.decode(rawData, (CallbackData));
-        console.log("data.currency", data.currency);
-        console.log("data.sender", data.sender);
-        console.log("data.depositAmount", data.depositAmount);
-        console.log("data.withdrawAmount", data.withdrawAmount);
+        console.log("[lockAcquired] data.currency", data.currency);
+        console.log("[lockAcquired] data.sender", data.sender);
+        console.log("[lockAcquired] data.depositAmount", data.depositAmount);
+        console.log("[lockAcquired] data.withdrawAmount", data.withdrawAmount);
         if (data.depositAmount > 0) {
             vault.sync(Currency.wrap(data.currency));
             // Transfer tokens directly from msg.sender to the vault
@@ -480,7 +486,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             );
             vault.settle();
         }
-        console.log("lockAcquired end");
+        console.log("[lockAcquired] lockAcquired end");
         return "";
     }
 
@@ -488,121 +494,45 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
     ///////////////////////////////////// Internal ////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Donates rent plus rent swapFeeToLP to the pool.
-    /// @dev Must be called while lock is acquired.
-    /// @param key Pool key.
-    /// @return address of the strategy to be used for the next swap.
-    // function _payRent(PoolKey memory key) internal returns (address) {
-    //     console.log("_payRent start");
-    //     RentData memory rentData = rentDatas[key.toId()];
-    //     PoolHookState memory hookState = poolHookStates[key.toId()];
-    //     console.log("rentData.lastPaidBlock", rentData.lastPaidBlock);
-    //     console.log("rentData.rentEndBlock", rentData.rentEndBlock);
-    //     console.log("hookState.strategy", hookState.strategy);
-    //     console.log("hookState.rentPerBlock", hookState.rentPerBlock);
-
-    //     bool alreadyPaidThisBlock = rentData.lastPaidBlock == block.number;
-    //     bool lastPaidBlockMarkedAtOrAfterRentFinished = rentData
-    //         .lastPaidBlock >= rentData.rentEndBlock;
-
-    //     bool triggerPayment = true;
-    //     if (
-    //         (alreadyPaidThisBlock || lastPaidBlockMarkedAtOrAfterRentFinished)
-    //     ) {
-    //         console.log("triggerPayment false");
-    //         triggerPayment = false;
-    //     }
-
-    //     bool hookStateChanged = false;
-
-    //     if (triggerPayment) {
-    //         uint48 blocksElapsed;
-    //         if (rentData.rentEndBlock <= uint48(block.number)) {
-    //             blocksElapsed = rentData.rentEndBlock - rentData.lastPaidBlock;
-
-    //             winners[key.toId()] = address(0);
-    //             winnerStrategies[key.toId()] = address(0);
-    //             rentData.shouldChangeStrategy = true;
-    //             hookState.rentPerBlock = 0;
-    //             hookStateChanged = true;
-
-    //             console.log("Rent period ended, resetting winner and strategy");
-    //         } else {
-    //             blocksElapsed = uint48(block.number) - rentData.lastPaidBlock;
-    //         }
-
-    //         // pay the rent
-    //         Currency currency = _getPoolRentCurrency(key);
-    //         uint128 rentAmount = hookState.rentPerBlock * blocksElapsed;
-    //         vault.burn(address(this), currency, rentAmount);
-
-    //         console.log("blocksElapsed", blocksElapsed);
-    //         console.log("rentAmount", rentAmount);
-    //         console.log(
-    //             "Paying rentAmount",
-    //             rentAmount,
-    //             "in currency",
-    //             Currency.unwrap(currency)
-    //         );
-
-    //         if (RENT_IN_TOKEN_ZERO) {
-    //             poolManager.donate(key, rentAmount, 0, "");
-    //         } else {
-    //             poolManager.donate(key, 0, rentAmount, "");
-    //         }
-
-    //         rentData.remainingRent -= rentAmount;
-    //         rentData.lastPaidBlock = uint48(block.number);
-    //         rentDatas[key.toId()] = rentData;
-    //     }
-
-    //     // check if we need to change strategy (due to the above logic/overbid/changeStrategy)
-    //     if (rentData.shouldChangeStrategy) {
-    //         rentData.shouldChangeStrategy = false;
-    //         hookState.strategy = winnerStrategies[key.toId()];
-    //         hookStateChanged = true;
-    //         console.log("Strategy changed to", hookState.strategy);
-    //     }
-
-    //     if (hookStateChanged) {
-    //         poolHookStates[key.toId()] = hookState;
-    //     }
-
-    //     console.log("_payRent end");
-    //     return hookState.strategy;
-    // }
-
     function _payRent(PoolKey memory key) internal returns (address) {
-        console.log("_payRent start");
+        console.log("[_payRent] _payRent start");
         RentData memory rentData = rentDatas[key.toId()];
         PoolHookState memory hookState = poolHookStates[key.toId()];
-        console.log("block number", block.number);
-        console.log("rentData.lastPaidBlock", rentData.lastPaidBlock);
-        console.log("rentData.rentEndBlock", rentData.rentEndBlock);
-        console.log("hookState.strategy", hookState.strategy);
-        console.log("hookState.rentPerBlock", hookState.rentPerBlock);
-        console.log("Remaining rent", rentData.remainingRent);
+        console.log("[_payRent] block number", block.number);
+        console.log(
+            "[_payRent] rentData.lastPaidBlock",
+            rentData.lastPaidBlock
+        );
+        console.log("[_payRent] rentData.rentEndBlock", rentData.rentEndBlock);
+        console.log("[_payRent] hookState.strategy", hookState.strategy);
+        console.log(
+            "[_payRent] hookState.rentPerBlock",
+            hookState.rentPerBlock
+        );
+        console.log("[_payRent] Remaining rent", rentData.remainingRent);
 
         if (rentData.lastPaidBlock == block.number) {
-            console.log("rentData.lastPaidBlock == block.number");
+            console.log("[_payRent] rentData.lastPaidBlock == block.number");
             return hookState.strategy;
         }
 
         if (rentData.lastPaidBlock >= rentData.rentEndBlock) {
             rentData.lastPaidBlock = uint48(block.number);
             rentDatas[key.toId()] = rentData;
-            console.log("rentData.lastPaidBlock >= rentData.rentEndBlock");
+            console.log(
+                "[_payRent] rentData.lastPaidBlock >= rentData.rentEndBlock"
+            );
             return hookState.strategy;
         }
 
         bool hookStateChanged = false;
         // check if we need to change strategy
         if (rentData.shouldChangeStrategy) {
-            console.log("rentData.shouldChangeStrategy");
+            console.log("[_payRent] rentData.shouldChangeStrategy");
             hookState.strategy = winnerStrategies[key.toId()];
             rentData.shouldChangeStrategy = false;
             hookStateChanged = true;
-            console.log("Strategy changed to", hookState.strategy);
+            console.log("[_payRent] Strategy changed to", hookState.strategy);
         }
 
         uint48 blocksElapsed;
@@ -613,7 +543,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             rentData.shouldChangeStrategy = true;
             hookState.rentPerBlock = 0;
             hookStateChanged = true;
-            console.log("Rent period ended, resetting winner and strategy");
+            console.log(
+                "[_payRent] Rent period ended, resetting winner and strategy"
+            );
         } else {
             blocksElapsed = uint48(block.number) - rentData.lastPaidBlock;
         }
@@ -631,10 +563,10 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
             vault.burn(address(this), currency, rentAmount);
             poolManager.donate(key, rentAmount, 0, "");
 
-            console.log("blocksElapsed", blocksElapsed);
-            console.log("rentAmount", rentAmount);
+            console.log("[_payRent] blocksElapsed", blocksElapsed);
+            console.log("[_payRent] rentAmount", rentAmount);
             console.log(
-                "Paying rentAmount",
+                "[_payRent] Paying rentAmount",
                 rentAmount,
                 "in currency",
                 Currency.unwrap(currency)
@@ -645,9 +577,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         if (hookStateChanged) {
             poolHookStates[key.toId()] = hookState;
         }
-        console.log("Remaining rent after", rentData.remainingRent);
+        console.log("[_payRent] Remaining rent after", rentData.remainingRent);
 
-        console.log("_payRent end");
+        console.log("[_payRent] _payRent end");
         return hookState.strategy;
     }
 }
