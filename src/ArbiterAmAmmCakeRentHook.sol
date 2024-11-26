@@ -84,6 +84,9 @@ contract ArbiterAmAmmCakeRentHook is
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     uint256 public immutable override GET_SWAP_FEE_GAS_LIMIT;
 
+    /// @inheritdoc IArbiterAmAmmHarbergerLease
+    uint48 public immutable override WINNER_FEE_SHARE;
+
     IERC20 public rentCurrency; // Rent currency
 
     constructor(
@@ -93,13 +96,15 @@ contract ArbiterAmAmmCakeRentHook is
         uint48 _minimumRentTimeInBlocks,
         uint64 _rentFactor,
         uint48 _transitionBlocks,
-        uint256 _getSwapFeeGasLimit
+        uint256 _getSwapFeeGasLimit,
+        uint48 _winnerFeeShare
     ) CLBaseHook(_poolManager) Tracker(_poolManager, _positionManager) {
         rentCurrency = _rentCurrency;
         MINIMUM_RENT_TIME_IN_BLOCKS = _minimumRentTimeInBlocks;
         RENT_FACTOR = _rentFactor;
         TRANSTION_BLOCKS = _transitionBlocks;
         GET_SWAP_FEE_GAS_LIMIT = _getSwapFeeGasLimit;
+        WINNER_FEE_SHARE = _winnerFeeShare;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////

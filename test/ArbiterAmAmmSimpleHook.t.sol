@@ -62,6 +62,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
     using CurrencyLibrary for Currency;
 
     uint24 constant DEFAULT_SWAP_FEE = 300;
+    uint24 constant DEFAULT_WINNER_FEE_SHARE = 50000;
     uint24 constant MAX_FEE = 10000;
     bytes constant ZERO_BYTES = bytes("");
 
@@ -88,6 +89,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             1000000, // RENT_FACTOR (100%)
             5, // TRANSTION_BLOCKS
             50000, // GET_SWAP_FEE_GAS_LIMIT
+            DEFAULT_WINNER_FEE_SHARE,
             true // RENT_IN_TOKEN_ZERO
         );
 
@@ -208,7 +210,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 expectedFeeAmount = (amountIn * MAX_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * MAX_FEE) / 1e6;
+        uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
+            1e6;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -271,7 +275,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 expectedFeeAmount = (amountIn * MAX_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * MAX_FEE) / 1e6;
+        uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
+            1e6;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -441,7 +447,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance1 = key.currency1.balanceOf(address(user1));
 
         // Calculate the expected fee using DEFAULT_SWAP_FEE
-        uint256 expectedFeeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
+        uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
+            1e6;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -535,7 +543,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 expectedFeeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
+        uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
+            1e6;
 
         console.log("prevBalance0: ", prevBalance0);
         console.log("postBalance0: ", postBalance0);
@@ -901,7 +911,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         // Perform a swap
         uint128 amountIn = 1e18;
-        uint128 expectedFeeAmount = (amountIn * updatedFee) / 1e6;
+
+        uint256 feeAmount = (amountIn * updatedFee) / 1e6;
+        uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
+            1e6;
 
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({

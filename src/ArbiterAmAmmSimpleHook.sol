@@ -70,6 +70,7 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         uint64 _rentFactor,
         uint48 _transitionBlocks,
         uint256 _getSwapFeeGasLimit,
+        uint48 _winnerFeeShare,
         bool _rentInTokenZero
     ) CLBaseHook(_poolManager) {
         console.log("[Constructor] Constructor start");
@@ -81,17 +82,17 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         console.log("[Constructor] _transitionBlocks", _transitionBlocks);
         console.log("[Constructor] _getSwapFeeGasLimit", _getSwapFeeGasLimit);
         console.log("[Constructor] _rentInTokenZero", _rentInTokenZero);
+        console.log("[Constructor] _winnerFeeShare", _winnerFeeShare);
         MINIMUM_RENT_TIME_IN_BLOCKS = _minimumRentTimeInBlocks;
         RENT_FACTOR = _rentFactor;
         TRANSTION_BLOCKS = _transitionBlocks;
         GET_SWAP_FEE_GAS_LIMIT = _getSwapFeeGasLimit;
         RENT_IN_TOKEN_ZERO = _rentInTokenZero;
+        if (_winnerFeeShare > 100000) {
+            revert InvalidWinnerFeeShare();
+        }
+        WINNER_FEE_SHARE = _winnerFeeShare;
         console.log("[Constructor] Constructor end");
-
-        // require(
-        //     uint16(uint160(address(this)) >> 144) == getHookPermissionsBitmap(),
-        //     "hookAddress mismatch"
-        // );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -204,16 +205,23 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         console.log("[beforeSwap] after strategy call");
         console.log("[beforeSwap] fee", fee);
 
-        int256 fees = (params.amountSpecified * int256(fee)) / 1e6;
-        uint256 absFees = fees < 0 ? uint256(-fees) : uint256(fees);
+        int256 totalFees = (params.amountSpecified * int256(fee)) / 1e6;
+        uint256 absTotalFees = totalFees < 0
+            ? uint256(-totalFees)
+            : uint256(totalFees);
 
-        console.log("[beforeSwap] fees", fees);
-        console.log("[beforeSwap] absFees", absFees);
+        // Calculate fee split
+        uint256 strategyFee = (absTotalFees * WINNER_FEE_SHARE) / 1e6;
+        uint256 lpFee = absTotalFees - strategyFee;
+
+        console.log("[beforeSwap] totalFees", totalFees);
+        console.log("[beforeSwap] strategyFee", strategyFee);
+        console.log("[beforeSwap] lpFee", lpFee);
 
         // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
-
         bool exactOut = params.amountSpecified > 0;
+
         Currency feeCurrency = exactOut == params.zeroForOne
             ? key.currency0
             : key.currency1;
@@ -226,16 +234,20 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
         );
 
         // Send fees to strategy
-        vault.mint(strategy, feeCurrency, absFees);
+        vault.mint(strategy, feeCurrency, strategyFee);
+        if (exactOut) {
+            poolManager.donate(key, lpFee, 0, "");
+        } else {
+            poolManager.donate(key, 0, lpFee, "");
+        }
 
         // Override LP fee to zero
         console.log("[beforeSwap] beforeSwap end");
         return (
             this.beforeSwap.selector,
             exactOut
-                ? toBeforeSwapDelta(0, int128(fees))
-                : toBeforeSwapDelta(0, -int128(fees)),
-            // toBeforeSwapDelta(0, 0),
+                ? toBeforeSwapDelta(0, int128(totalFees))
+                : toBeforeSwapDelta(0, -int128(totalFees)),
             LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
     }
@@ -255,6 +267,9 @@ contract ArbiterAmAmmSimpleHook is CLBaseHook, IArbiterAmAmmHarbergerLease {
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     uint256 public immutable override GET_SWAP_FEE_GAS_LIMIT;
+
+    /// @inheritdoc IArbiterAmAmmHarbergerLease
+    uint48 public immutable override WINNER_FEE_SHARE;
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function depositOf(
