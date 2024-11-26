@@ -20,6 +20,9 @@ interface IArbiterAmAmmHarbergerLease {
     /// @return The gas limit for the getSwapFee call
     function GET_SWAP_FEE_GAS_LIMIT() external view returns (uint256);
 
+    /// @return The percentage of the swap fee that will be paid to the winner
+    function WINNER_FEE_SHARE() external view returns (uint48);
+
     /// @return The deposit of the account for the asset
     /// @param asset The address of the ERC20 to check
     /// @param account The address of the account to check
@@ -97,4 +100,5 @@ interface IArbiterAmAmmHarbergerLease {
     error PoolNotInitialized();
     error InsufficientDeposit();
     error CallerNotWinner();
+    error InvalidWinnerFeeShare();
 }
