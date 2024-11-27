@@ -91,20 +91,7 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
     //////////////////////////////// ICLSubscriber Implementation //////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////
 
-    function _onSubscribeTracker(uint256 tokenId) internal virtual {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
-        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
-
-        pools[poolKey.toId()].modifyLiquidity(
-            PoolExtension.ModifyLiquidityParams({
-                tickLower: positionInfo.tickLower(),
-                tickUpper: positionInfo.tickUpper(),
-                liquidityDelta: int128(liquidity),
-                tickSpacing: poolKey.parameters.getTickSpacing()
-            })
-        );
-    }
+    function _onSubscribeTracker(uint256 tokenId) internal virtual {}
 
     /// @inheritdoc ICLSubscriber
     function notifySubscribe(
@@ -114,20 +101,7 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
         _onSubscribeTracker(tokenId);
     }
 
-    function _onUnubscribeTracker(uint256 tokenId) internal virtual {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
-        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
-
-        pools[poolKey.toId()].modifyLiquidity(
-            PoolExtension.ModifyLiquidityParams({
-                tickLower: positionInfo.tickLower(),
-                tickUpper: positionInfo.tickUpper(),
-                liquidityDelta: -int128(liquidity),
-                tickSpacing: poolKey.parameters.getTickSpacing()
-            })
-        );
-    }
+    function _onUnubscribeTracker(uint256 tokenId) internal virtual {}
 
     /// @inheritdoc ICLSubscriber
     function notifyUnsubscribe(
@@ -139,22 +113,7 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
     function _onModifyLiquidityTracker(
         uint256 tokenId,
         int256 liquidityDelta
-    ) internal virtual {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
-
-        int128 liquidityDelta128 = int128(liquidityDelta);
-
-        pools[poolKey.toId()].modifyLiquidity(
-            PoolExtension.ModifyLiquidityParams({
-                tickLower: positionInfo.tickLower(),
-                tickUpper: positionInfo.tickUpper(),
-                liquidityDelta: liquidityDelta128,
-                tickSpacing: poolKey.parameters.getTickSpacing()
-            })
-        );
-        positions[tokenId].updateLiquidity(liquidityDelta128);
-    }
+    ) internal virtual {}
 
     // /// @inheritdoc ICLSubscriber
     // function notifyModifyLiquidity(uint256 tokenId, int256 liquidityDelta, BalanceDelta feesAccrued) external {

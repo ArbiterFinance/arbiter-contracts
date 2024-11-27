@@ -17,7 +17,7 @@ import {CustomRevert} from "pancake-v4-core/src/libraries/CustomRevert.sol";
 import {console} from "forge-std/console.sol";
 
 /// @notice a library that records staked/subscribed liquiduty and allows for the calculation of
-///         the seconds per liquidity of a position
+///         the rewards per liquidity of a position
 library PoolExtension {
     using SafeCast for *;
     using TickBitmap for mapping(int16 => uint256);
@@ -34,23 +34,24 @@ library PoolExtension {
         uint128 liquidityGross;
         // amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
         int128 liquidityNet;
-        // the seconds per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+        // the rewards per unit of liquidity on the _other_ side of this tick (relative to the current tick)
         // only has relative meaning, not absolute — the value depends on when the tick is initialized
-        uint256 secondsPerLiquidityOutsideX128;
+        uint256 rewardsPerLiquidityOutsideX128;
     }
 
     /// @dev The state of a pool extension
     struct State {
         int24 tick;
-        uint256 secondsPerLiquidityCumulativeX128;
+        uint72 rewardsPerBlock;
+        uint256 rewardsPerLiquidityCumulativeX128;
         uint128 liquidity;
         mapping(int24 tick => TickInfo) ticks;
         mapping(int16 wordPos => uint256) tickBitmap;
         mapping(bytes32 positionKey => CLPosition.Info) positions;
-        uint32 lastUpdateTimestamp;
+        uint32 lastUpdateBlock;
     }
 
-    function getSecondsPerLiquidityInsideX128(
+    function getRewardsPerLiquidityInsideX128(
         State storage self,
         int24 tickLower,
         int24 tickUpper
@@ -58,73 +59,75 @@ library PoolExtension {
         unchecked {
             if (tickLower >= tickUpper) return 0;
             console.log(
-                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick",
+                "[PoolExtension][getRewardsPerLiquidityInsideX128] self.tick",
                 self.tick
             );
 
             if (self.tick < tickLower) {
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick < tickLower"
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.tick < tickLower"
                 );
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickLower].secondsPerLiquidityOutsideX128",
-                    self.ticks[tickLower].secondsPerLiquidityOutsideX128
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.ticks[tickLower].rewardsPerLiquidityOutsideX128",
+                    self.ticks[tickLower].rewardsPerLiquidityOutsideX128
                 );
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
-                    self.secondsPerLiquidityCumulativeX128
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.rewardsPerLiquidityCumulativeX128",
+                    self.rewardsPerLiquidityCumulativeX128
                 );
                 return
-                    self.ticks[tickLower].secondsPerLiquidityOutsideX128 -
-                    self.secondsPerLiquidityCumulativeX128;
+                    self.ticks[tickLower].rewardsPerLiquidityOutsideX128 -
+                    self.rewardsPerLiquidityCumulativeX128;
             }
             if (self.tick >= tickUpper) {
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick >= tickUpper"
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.tick >= tickUpper"
                 );
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickUpper].secondsPerLiquidityOutsideX128",
-                    self.ticks[tickUpper].secondsPerLiquidityOutsideX128
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.ticks[tickUpper].rewardsPerLiquidityOutsideX128",
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128
                 );
                 console.log(
-                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
-                    self.secondsPerLiquidityCumulativeX128
+                    "[PoolExtension][getRewardsPerLiquidityInsideX128] self.rewardsPerLiquidityCumulativeX128",
+                    self.rewardsPerLiquidityCumulativeX128
                 );
                 return
-                    self.secondsPerLiquidityCumulativeX128 -
-                    self.ticks[tickUpper].secondsPerLiquidityOutsideX128;
+                    self.rewardsPerLiquidityCumulativeX128 -
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128;
             }
             console.log(
-                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick >= tickLower && self.tick < tickUpper"
+                "[PoolExtension][getRewardsPerLiquidityInsideX128] self.tick >= tickLower && self.tick < tickUpper"
             );
             console.log(
-                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickUpper].secondsPerLiquidityOutsideX128",
-                self.ticks[tickUpper].secondsPerLiquidityOutsideX128
+                "[PoolExtension][getRewardsPerLiquidityInsideX128] self.ticks[tickUpper].rewardsPerLiquidityOutsideX128",
+                self.ticks[tickUpper].rewardsPerLiquidityOutsideX128
             );
             console.log(
-                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickLower].secondsPerLiquidityOutsideX128",
-                self.ticks[tickLower].secondsPerLiquidityOutsideX128
+                "[PoolExtension][getRewardsPerLiquidityInsideX128] self.ticks[tickLower].rewardsPerLiquidityOutsideX128",
+                self.ticks[tickLower].rewardsPerLiquidityOutsideX128
             );
             console.log(
-                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
-                self.secondsPerLiquidityCumulativeX128
+                "[PoolExtension][getRewardsPerLiquidityInsideX128] self.rewardsPerLiquidityCumulativeX128",
+                self.rewardsPerLiquidityCumulativeX128
             );
             return
-                self.secondsPerLiquidityCumulativeX128 -
-                self.ticks[tickUpper].secondsPerLiquidityOutsideX128 -
-                self.ticks[tickLower].secondsPerLiquidityOutsideX128;
+                self.rewardsPerLiquidityCumulativeX128 -
+                self.ticks[tickUpper].rewardsPerLiquidityOutsideX128 -
+                self.ticks[tickLower].rewardsPerLiquidityOutsideX128;
         }
     }
 
-    function getSecondsPerLiquidityCumulativeX128(
+    function getRewardsPerLiquidityCumulativeX128(
         State storage self
     ) internal view returns (uint256) {
-        return self.secondsPerLiquidityCumulativeX128;
+        return self.rewardsPerLiquidityCumulativeX128;
     }
 
     function initialize(State storage self, int24 tick) internal {
         self.tick = tick;
-        self.lastUpdateTimestamp = uint32(block.timestamp); // Initialize the timestamp
+        unchecked {
+            self.lastUpdateBlock = uint32(block.number); // Initialize the timestamp, allow overflow
+        }
     }
 
     struct ModifyLiquidityParams {
@@ -144,18 +147,19 @@ library PoolExtension {
         uint128 liquidityGrossAfterUpper;
     }
 
-    function updateCumulative(
-        State storage self,
-        uint32 blockTimestamp
-    ) internal {
-        uint32 timeElapsed = blockTimestamp - self.lastUpdateTimestamp;
-        if (timeElapsed > 0) {
-            if (self.liquidity > 0) {
-                self.secondsPerLiquidityCumulativeX128 +=
-                    (uint256(timeElapsed) << 128) /
-                    self.liquidity;
+    function updateCumulative(State storage self, uint32 blockNumber) internal {
+        unchecked {
+            // underflow happens only after block number overflows
+            // the substraction result is valid unless more than 2*2^32 blocks passed since last update
+            uint32 blocksElapsed = blockNumber - self.lastUpdateBlock;
+            if (blocksElapsed > 0) {
+                if (self.liquidity > 0) {
+                    self.rewardsPerLiquidityCumulativeX128 +=
+                        (uint256(blocksElapsed * self.rewardsPerBlock) << 128) /
+                        self.liquidity;
+                }
             }
-            self.lastUpdateTimestamp = blockTimestamp;
+            self.lastUpdateBlock = blockNumber;
         }
     }
 
@@ -270,7 +274,7 @@ library PoolExtension {
             int128 liquidityNet = PoolExtension.crossTick(
                 self,
                 currentTick,
-                self.secondsPerLiquidityCumulativeX128
+                self.rewardsPerLiquidityCumulativeX128
             );
             console.log(
                 "[PoolExtension][crossToActiveTick] liquidityNet",
@@ -336,8 +340,8 @@ library PoolExtension {
         if (liquidityGrossBefore == 0) {
             // by convention, we assume that all growth before a tick was initialized happened _below_ the tick
             if (tick <= self.tick) {
-                info.secondsPerLiquidityOutsideX128 = self
-                    .secondsPerLiquidityCumulativeX128;
+                info.rewardsPerLiquidityOutsideX128 = self
+                    .rewardsPerLiquidityCumulativeX128;
             }
         }
 
@@ -374,18 +378,18 @@ library PoolExtension {
     /// @notice Transitions to next tick as needed by price movement
     /// @param self The Pool state struct
     /// @param tick The destination tick of the transition
-    /// @param secondsPerLiquidityCumulativeX128 The seconds per active liquidity in total for the pool
+    /// @param rewardsPerLiquidityCumulativeX128 The rewards per active liquidity in total for the pool
     /// @return liquidityNet The amount of liquidity added (subtracted) when tick is crossed from left to right (right to left)
     function crossTick(
         State storage self,
         int24 tick,
-        uint256 secondsPerLiquidityCumulativeX128
+        uint256 rewardsPerLiquidityCumulativeX128
     ) internal returns (int128 liquidityNet) {
         unchecked {
             TickInfo storage info = self.ticks[tick];
-            info.secondsPerLiquidityOutsideX128 =
-                secondsPerLiquidityCumulativeX128 -
-                info.secondsPerLiquidityOutsideX128;
+            info.rewardsPerLiquidityOutsideX128 =
+                rewardsPerLiquidityCumulativeX128 -
+                info.rewardsPerLiquidityOutsideX128;
             liquidityNet = info.liquidityNet;
         }
     }
