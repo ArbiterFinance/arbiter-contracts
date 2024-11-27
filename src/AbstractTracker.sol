@@ -91,7 +91,7 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
     //////////////////////////////// ICLSubscriber Implementation //////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////
 
-    function _onSubscribeTracker(uint256 tokenId) internal {
+    function _onSubscribeTracker(uint256 tokenId) internal virtual {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
@@ -110,11 +110,11 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
     function notifySubscribe(
         uint256 tokenId,
         bytes memory data
-    ) external onlyPositionManager {
+    ) external virtual onlyPositionManager {
         _onSubscribeTracker(tokenId);
     }
 
-    function _onUnubscribeTracker(uint256 tokenId) internal {
+    function _onUnubscribeTracker(uint256 tokenId) internal virtual {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
@@ -130,14 +130,16 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
     }
 
     /// @inheritdoc ICLSubscriber
-    function notifyUnsubscribe(uint256 tokenId) external onlyPositionManager {
+    function notifyUnsubscribe(
+        uint256 tokenId
+    ) external virtual onlyPositionManager {
         _onUnubscribeTracker(tokenId);
     }
 
     function _onModifyLiquidityTracker(
         uint256 tokenId,
         int256 liquidityDelta
-    ) internal {
+    ) internal virtual {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
 
@@ -164,7 +166,7 @@ abstract contract Tracker is ILiquididityPerSecondTrackerHook {
         uint256 tokenId,
         address previousOwner,
         address newOwner
-    ) external {
+    ) external virtual {
         // do nothing
     }
 }

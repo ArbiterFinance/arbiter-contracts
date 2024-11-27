@@ -30,33 +30,11 @@ contract SoloTracker is CLBaseHook, Tracker {
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
 
-    mapping(PoolId => PoolExtension.State) public pools;
-    mapping(uint256 => PositionExtension.State) public positions;
-
-    ICLPositionManager public immutable positionManager;
-    ICLPoolManager public immutable poolManager;
-
-    modifier onlyPositionManager() {
-        require(
-            msg.sender == address(positionManager),
-            "PancakeSwapV4Staker::onlyPositionManager: not a cakev4 nft"
-        );
-        _;
-    }
-
     constructor(
         ICLPoolManager _poolManager,
         ICLPositionManager _positionManager
     ) CLBaseHook(_poolManager) Tracker(_poolManager, _positionManager) {
         //
-    }
-
-    function activeTick(PoolId poolId) public view returns (int24) {
-        return pools[poolId].tick;
-    }
-
-    function activeLiquidty(PoolId poolId) public view returns (uint128) {
-        return pools[poolId].liquidity;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +73,7 @@ contract SoloTracker is CLBaseHook, Tracker {
         uint160,
         int24 tick
     ) external override returns (bytes4) {
-        _afterInitializeTracker(key, tick);
+        pools[key.toId()].initialize(tick);
         return this.afterInitialize.selector;
     }
 
@@ -110,14 +88,10 @@ contract SoloTracker is CLBaseHook, Tracker {
         return (this.afterSwap.selector, 0);
     }
 
-    function _afterInitializeTracker(
-        PoolKey calldata key,
-        int24 tick
-    ) internal {
-        pools[key.toId()].tick = tick;
-    }
-
     function _afterSwapTracker(PoolKey calldata key) internal {
+        uint32 blockTimestamp = uint32(block.timestamp);
+        pools[key.toId()].updateCumulative(blockTimestamp);
+
         (, int24 tick, , ) = poolManager.getSlot0(key.toId());
         pools[key.toId()].crossToActiveTick(
             key.parameters.getTickSpacing(),
@@ -129,7 +103,7 @@ contract SoloTracker is CLBaseHook, Tracker {
     //////////////////////////////// ISubscriber Implementation //////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////
 
-    function _onSubscribeTracker(uint256 tokenId) internal {
+    function _onSubscribeTracker(uint256 tokenId) internal override {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
@@ -148,11 +122,11 @@ contract SoloTracker is CLBaseHook, Tracker {
     function notifySubscribe(
         uint256 tokenId,
         bytes memory
-    ) external onlyPositionManager {
+    ) external override onlyPositionManager {
         _onSubscribeTracker(tokenId);
     }
 
-    function _onUnubscribeTracker(uint256 tokenId) internal {
+    function _onUnubscribeTracker(uint256 tokenId) internal override {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
@@ -168,14 +142,16 @@ contract SoloTracker is CLBaseHook, Tracker {
     }
 
     /// @inheritdoc ICLSubscriber
-    function notifyUnsubscribe(uint256 tokenId) external onlyPositionManager {
+    function notifyUnsubscribe(
+        uint256 tokenId
+    ) external override onlyPositionManager {
         _onUnubscribeTracker(tokenId);
     }
 
     function _onModifyLiquidityTracker(
         uint256 tokenId,
         int256 liquidityChange
-    ) internal {
+    ) internal override {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
 
@@ -203,7 +179,25 @@ contract SoloTracker is CLBaseHook, Tracker {
         uint256 tokenId,
         address previousOwner,
         address newOwner
-    ) external {
+    ) external override {
         // do nothing
+    }
+
+    function getSecondsPerLiquidityInsideX128(
+        PoolKey calldata poolKey,
+        int24 tickLower,
+        int24 tickUpper
+    ) external view override returns (uint256) {
+        return
+            pools[poolKey.toId()].getSecondsPerLiquidityInsideX128(
+                tickLower,
+                tickUpper
+            );
+    }
+
+    function getSecondsPerLiquidityCumulativeX128(
+        PoolKey calldata poolKey
+    ) external view override returns (uint256) {
+        return pools[poolKey.toId()].getSecondsPerLiquidityCumulativeX128();
     }
 }
