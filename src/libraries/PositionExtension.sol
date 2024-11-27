@@ -17,9 +17,9 @@ library PositionExtension {
 
     // info stored for each user's position
     struct State {
-        uint128 liquidity;
         // the amount of liquidity owned by this position
-        uint256 secondsPerLiquidityLastX128;
+        uint256 rewardsPerLiquidityLastX128;
+        uint256 acruedReward;
     }
 
     /// @notice Returns the State struct of a position, given an owner and position boundaries
@@ -72,61 +72,44 @@ library PositionExtension {
         }
     }
 
-    // /// @notice Credits accumulated fees to a user's position
-    // /// @param self The individual position to update
-    // /// @param liquidityDelta The change in pool liquidity as a result of the position update
-    // /// @param feeGrowthInside0X128 The all-time fee growth in currency0, per unit of liquidity, inside the position's tick boundaries
-    // /// @param feeGrowthInside1X128 The all-time fee growth in currency1, per unit of liquidity, inside the position's tick boundaries
-    // /// @return feesOwed0 The amount of currency0 owed to the position owner
-    // /// @return feesOwed1 The amount of currency1 owed to the position owner
-    // function update(
-    //     State storage self,
-    //     int128 liquidityDelta,
-    //     uint256 feeGrowthInside0X128,
-    //     uint256 feeGrowthInside1X128
-    // ) internal returns (uint256 feesOwed0, uint256 feesOwed1) {
-    //     uint128 liquidity = self.liquidity;
-
-    //     if (liquidityDelta == 0) {
-    //         // disallow pokes for 0 liquidity positions
-    //         if (liquidity == 0) revert CannotUpdateEmptyPosition();
-    //     } else {
-    //         self.liquidity = LiquidityMath.addDelta(liquidity, liquidityDelta);
-    //     }
-
-    //     // calculate accumulated fees. overflow in the subtraction of fee growth is expected
-    //     unchecked {
-    //         feesOwed0 = FullMath.mulDiv(
-    //             feeGrowthInside0X128 - self.feeGrowthInside0LastX128,
-    //             liquidity,
-    //             FixedPoint128.Q128
-    //         );
-    //         feesOwed1 = FullMath.mulDiv(
-    //             feeGrowthInside1X128 - self.feeGrowthInside1LastX128,
-    //             liquidity,
-    //             FixedPoint128.Q128
-    //         );
-    //     }
-
-    //     // update the position
-    //     self.feeGrowthInside0LastX128 = feeGrowthInside0X128;
-    //     self.feeGrowthInside1LastX128 = feeGrowthInside1X128;
-    // }
-
-    /// @notice Credits accumulated fees to a user's position
-    /// @param self The individual position to update
-    /// @param liquidityDelta The change in pool liquidity as a result of the position update
-    function updateLiquidity(
+    /// @notice Credits accumulated rewards to a user's position
+    function updateRewards(
         State storage self,
-        int128 liquidityDelta
+        uint128 liquidity,
+        uint256 rewardsPerLiquidityInsideX128
     ) internal {
-        uint128 liquidity = self.liquidity;
+        unchecked {
+            uint256 rewardsPerLiquididtyGrowthX128 = rewardsPerLiquidityInsideX128 -
+                    self.rewardsPerLiquidityLastX128;
 
-        if (liquidityDelta == 0) {
-            // disallow pokes for 0 liquidity positions
-            if (liquidity == 0) revert CannotUpdateEmptyPosition();
-        } else {
-            self.liquidity = LiquidityMath.addDelta(liquidity, liquidityDelta);
+            self.acruedReward += FullMath.mulDiv(
+                rewardsPerLiquididtyGrowthX128,
+                liquidity,
+                FixedPoint128.Q128
+            );
+
+            self.rewardsPerLiquidityLastX128 = rewardsPerLiquidityInsideX128;
         }
+    }
+
+    function collectRewards(
+        State storage self
+    ) internal returns (uint256 rewards) {
+        rewards = self.acruedReward;
+        self.acruedReward = 0;
+    }
+
+    function initialize(
+        State storage self,
+        uint256 rewardsPerLiquididtyInsideX128
+    ) internal {
+        self.rewardsPerLiquidityLastX128 = rewardsPerLiquididtyInsideX128;
+        self.acruedReward = 0;
+    }
+
+    function kill(State storage self) internal returns (uint256 rewards) {
+        rewards = self.acruedReward;
+        self.rewardsPerLiquidityLastX128 = 0;
+        self.acruedReward = 0;
     }
 }
