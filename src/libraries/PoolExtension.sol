@@ -14,6 +14,7 @@ import {ProtocolFeeLibrary} from "pancake-v4-core/src/libraries/ProtocolFeeLibra
 import {LiquidityMath} from "pancake-v4-core/src/pool-cl/libraries/LiquidityMath.sol";
 import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
 import {CustomRevert} from "pancake-v4-core/src/libraries/CustomRevert.sol";
+import {console} from "forge-std/console.sol";
 
 /// @notice a library that records staked/subscribed liquiduty and allows for the calculation of
 ///         the seconds per liquidity of a position
@@ -46,6 +47,7 @@ library PoolExtension {
         mapping(int24 tick => TickInfo) ticks;
         mapping(int16 wordPos => uint256) tickBitmap;
         mapping(bytes32 positionKey => CLPosition.Info) positions;
+        uint32 lastUpdateTimestamp;
     }
 
     function getSecondsPerLiquidityInsideX128(
@@ -55,17 +57,58 @@ library PoolExtension {
     ) internal view returns (uint256) {
         unchecked {
             if (tickLower >= tickUpper) return 0;
+            console.log(
+                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick",
+                self.tick
+            );
 
             if (self.tick < tickLower) {
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick < tickLower"
+                );
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickLower].secondsPerLiquidityOutsideX128",
+                    self.ticks[tickLower].secondsPerLiquidityOutsideX128
+                );
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
+                    self.secondsPerLiquidityCumulativeX128
+                );
                 return
                     self.ticks[tickLower].secondsPerLiquidityOutsideX128 -
                     self.secondsPerLiquidityCumulativeX128;
             }
             if (self.tick >= tickUpper) {
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick >= tickUpper"
+                );
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickUpper].secondsPerLiquidityOutsideX128",
+                    self.ticks[tickUpper].secondsPerLiquidityOutsideX128
+                );
+                console.log(
+                    "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
+                    self.secondsPerLiquidityCumulativeX128
+                );
                 return
                     self.secondsPerLiquidityCumulativeX128 -
                     self.ticks[tickUpper].secondsPerLiquidityOutsideX128;
             }
+            console.log(
+                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.tick >= tickLower && self.tick < tickUpper"
+            );
+            console.log(
+                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickUpper].secondsPerLiquidityOutsideX128",
+                self.ticks[tickUpper].secondsPerLiquidityOutsideX128
+            );
+            console.log(
+                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.ticks[tickLower].secondsPerLiquidityOutsideX128",
+                self.ticks[tickLower].secondsPerLiquidityOutsideX128
+            );
+            console.log(
+                "[PoolExtension][getSecondsPerLiquidityInsideX128] self.secondsPerLiquidityCumulativeX128",
+                self.secondsPerLiquidityCumulativeX128
+            );
             return
                 self.secondsPerLiquidityCumulativeX128 -
                 self.ticks[tickUpper].secondsPerLiquidityOutsideX128 -
@@ -73,8 +116,15 @@ library PoolExtension {
         }
     }
 
+    function getSecondsPerLiquidityCumulativeX128(
+        State storage self
+    ) internal view returns (uint256) {
+        return self.secondsPerLiquidityCumulativeX128;
+    }
+
     function initialize(State storage self, int24 tick) internal {
         self.tick = tick;
+        self.lastUpdateTimestamp = uint32(block.timestamp); // Initialize the timestamp
     }
 
     struct ModifyLiquidityParams {
@@ -94,6 +144,21 @@ library PoolExtension {
         uint128 liquidityGrossAfterUpper;
     }
 
+    function updateCumulative(
+        State storage self,
+        uint32 blockTimestamp
+    ) internal {
+        uint32 timeElapsed = blockTimestamp - self.lastUpdateTimestamp;
+        if (timeElapsed > 0) {
+            if (self.liquidity > 0) {
+                self.secondsPerLiquidityCumulativeX128 +=
+                    (uint256(timeElapsed) << 128) /
+                    self.liquidity;
+            }
+            self.lastUpdateTimestamp = blockTimestamp;
+        }
+    }
+
     /// @notice Effect changes to a position in a pool
     /// @dev PoolManager checks that the pool is initialized before calling
     /// @param params the position details and the change to the position's liquidity to effect
@@ -109,6 +174,7 @@ library PoolExtension {
 
         // if we need to update the ticks, do it
         if (liquidityDelta != 0) {
+            console.log("[PoolExtension][modifyLiquidity] Updating liquidity");
             (state.flippedLower, state.liquidityGrossAfterLower) = updateTick(
                 self,
                 tickLower,
@@ -123,15 +189,24 @@ library PoolExtension {
             );
 
             if (state.flippedLower) {
+                console.log(
+                    "[PoolExtension][modifyLiquidity] Flipped lower tick",
+                    tickLower
+                );
                 self.tickBitmap.flipTick(tickLower, params.tickSpacing);
             }
             if (state.flippedUpper) {
+                console.log(
+                    "[PoolExtension][modifyLiquidity] Flipped upper tick",
+                    tickUpper
+                );
                 self.tickBitmap.flipTick(tickUpper, params.tickSpacing);
             }
         }
 
         // clear any tick data that is no longer needed
         if (liquidityDelta < 0) {
+            console.log("[PoolExtension][modifyLiquidity] Clearing tick");
             if (state.flippedLower) {
                 clearTick(self, tickLower);
             }
@@ -142,6 +217,7 @@ library PoolExtension {
 
         // update the active liquidity
         if (params.tickLower < self.tick && self.tick < params.tickUpper) {
+            console.log("[PoolExtension][modifyLiquidity] Updating liquidty");
             self.liquidity = LiquidityMath.addDelta(
                 self.liquidity,
                 liquidityDelta
@@ -161,11 +237,29 @@ library PoolExtension {
         // initialize to the current liquidity
         int128 liquidityChange = 0;
 
+        //eq to zeroForOne
         bool goingLeft = activeTick <= currentTick;
 
+        console.log(
+            "[PoolExtension][crossToActiveTick] activeTick",
+            activeTick
+        );
+        console.log(
+            "[PoolExtension][crossToActiveTick] currentTick",
+            currentTick
+        );
+        console.log("[PoolExtension][crossToActiveTick] goingLeft", goingLeft);
+        console.log(
+            "[PoolExtension][crossToActiveTick] liquidityChange",
+            liquidityChange
+        );
+        console.log(
+            "[PoolExtension][crossToActiveTick] tickSpacing",
+            tickSpacing
+        );
+
         while ((activeTick < currentTick) == goingLeft) {
-            bool initialized;
-            (currentTick, initialized) = self
+            (int24 nextTick, ) = self
                 .tickBitmap
                 .nextInitializedTickWithinOneWord(
                     currentTick,
@@ -178,13 +272,33 @@ library PoolExtension {
                 currentTick,
                 self.secondsPerLiquidityCumulativeX128
             );
+            console.log(
+                "[PoolExtension][crossToActiveTick] liquidityNet",
+                liquidityNet
+            );
 
             // if we're moving leftward, we interpret liquidityNet as the opposite sign
             // safe because liquidityNet cannot be type(int128).min
             unchecked {
-                if (goingLeft) liquidityChange = -liquidityNet;
+                if (goingLeft) liquidityNet = -liquidityNet;
+            }
+
+            console.log(
+                "[PoolExtension][crossToActiveTick] nextTick",
+                nextTick
+            );
+            console.log(
+                "[PoolExtension][crossToActiveTick] currentTick",
+                currentTick
+            );
+            unchecked {
+                currentTick = goingLeft ? nextTick - 1 : nextTick;
             }
             liquidityChange += liquidityNet;
+            console.log(
+                "[PoolExtension][crossToActiveTick] liquidityChange",
+                liquidityChange
+            );
         }
 
         self.tick = activeTick;
