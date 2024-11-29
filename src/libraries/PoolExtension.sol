@@ -147,6 +147,7 @@ library PoolExtension {
         uint128 liquidityGrossAfterUpper;
     }
 
+    /// @notice Updates the cumulative rewards per liquidity for the pool from the last update block to the blockNumber
     function updateCumulative(State storage self, uint32 blockNumber) internal {
         unchecked {
             // underflow happens only after block number overflows
@@ -161,6 +162,10 @@ library PoolExtension {
             }
             self.lastUpdateBlock = blockNumber;
         }
+    }
+
+    function donate(State storage self, uint256 rewardsAmount) internal {
+        self.rewardsPerLiquidityCumulativeX128 += rewardsAmount;
     }
 
     /// @notice Effect changes to a position in a pool
