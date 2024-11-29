@@ -21,18 +21,19 @@ import {CLPool} from "pancake-v4-core/src/pool-cl/libraries/CLPool.sol";
 import {CLPoolGetters} from "pancake-v4-core/src/pool-cl/libraries/CLPoolGetters.sol";
 import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
+contract InRangeIncentiveHook is CLBaseHook, ILiquididityPerSecondTracker {
     using PoolExtension for PoolExtension.State;
     using PositionExtension for PositionExtension.State;
     using PoolIdLibrary for PoolKey;
     using CLPositionInfoLibrary for CLPositionInfo;
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
-
     mapping(PoolId => PoolExtension.State) public pools;
     mapping(uint256 => PositionExtension.State) public positions;
     ICLPositionManager public immutable positionManager;
+    IERC20 public incentiveToken;
 
     modifier onlyPositionManager() {
         require(
@@ -44,9 +45,11 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
 
     constructor(
         ICLPoolManager _poolManager,
-        ICLPositionManager _positionManager
+        ICLPositionManager _positionManager,
+        IERC20 _incentiveToken
     ) CLBaseHook(_poolManager) {
         positionManager = _positionManager;
+        incentiveToken = _incentiveToken;
     }
 
     function _internalChangeRewardRate(
@@ -57,11 +60,6 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
         pools[poolId].updateCumulative(blockNumber);
         pools[poolId].rewardsPerBlock = rewardRate;
     }
-
-    ////TODO
-    // whenever we updateReward we must first check if the rent hasnt already finished
-    // for example if the alst update was 10 blocks ago and rent finished 5 block ago
-    // we must only update reward for 5 block and then set reward to 0
 
     //////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////// Hooks Implementation ////////////////////////////////
@@ -185,9 +183,12 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
         uint256 rewards = positions[tokenId].acruedReward;
         delete positions[tokenId];
 
-        // if (rewards > 0) {
-        //     positionManager.transferRewards(tokenId, rewards);
-        // }
+        if (rewards > 0) {
+            incentiveToken.transfer(
+                IERC721(address(positionManager)).ownerOf(tokenId),
+                rewards
+            );
+        }
     }
 
     /// @inheritdoc ICLSubscriber
@@ -301,6 +302,8 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
         );
         rewards = positions[tokenId].collectRewards();
 
-        /// transfer rewards to to.
+        if (rewards > 0) {
+            incentiveToken.transfer(to, rewards);
+        }
     }
 }
