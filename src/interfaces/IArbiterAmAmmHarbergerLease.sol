@@ -8,20 +8,34 @@ import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
 /// @notice The auctioned assets are the rights to control and collect swap fees from V4 liquidity pools.
 /// @dev strategy SHOULD implement IArbiterAmAmmStrategy
 interface IArbiterAmAmmHarbergerLease {
+    error NotDynamicFee();
+    error RentTooLow();
+    error RentTooShort();
+    error PoolNotInitialized();
+    error InsufficientDeposit();
+    error CallerNotWinner();
+    error InvalidWinnerFeeShare();
+
     /// @return  The minimum time in blocks that an overbidding rent must last
-    function MINIMUM_RENT_TIME_IN_BLOCKS() external view returns (uint48);
+    function minimumRentBlocks(
+        PoolKey calldata key
+    ) external view returns (uint64);
 
     /// @return The required factor by which an overbidding rent must exceed the current rent, unless the current rent finishes in fewer than TRANSITION_BLOCKS.
-    function RENT_FACTOR() external view returns (uint64);
+    function rentFactor(PoolKey calldata key) external view returns (uint8);
 
     /// @return The number of blocks before the end of the rent when any bid is overbidding the current rent
-    function TRANSTION_BLOCKS() external view returns (uint48);
+    function transitionBlocks(
+        PoolKey calldata key
+    ) external view returns (uint64);
 
     /// @return The gas limit for the getSwapFee call
-    function GET_SWAP_FEE_GAS_LIMIT() external view returns (uint256);
+    function getFeeGasLimit(
+        PoolKey calldata key
+    ) external view returns (uint256);
 
     /// @return The percentage of the swap fee that will be paid to the winner
-    function WINNER_FEE_SHARE() external view returns (uint48);
+    function winnerFeeShare(PoolKey calldata key) external view returns (uint8);
 
     /// @return The deposit of the account for the asset
     /// @param asset The address of the ERC20 to check
@@ -56,11 +70,15 @@ interface IArbiterAmAmmHarbergerLease {
 
     /// @return The rent per block for the pool in the pool's bidding currency
     /// @param key The key of the pool to check
-    function rentPerBlock(PoolKey calldata key) external view returns (uint96);
+    function currentRentPerBlock(
+        PoolKey calldata key
+    ) external view returns (uint96);
 
     /// @return The block number of the last rent payment
     /// @param key The key of the pool to check
-    function rentEndBlock(PoolKey calldata key) external view returns (uint48);
+    function currentRentEndBlock(
+        PoolKey calldata key
+    ) external view returns (uint48);
 
     /// @notice Transfers ERC20 from msg.sender into this contract to be later used by msg.sender for bidding
     /// @param asset The address of the ERC20 to deposit
@@ -93,12 +111,4 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param key The key of the pool to change the strategy for
     /// @param strategy The address of the new strategy
     function changeStrategy(PoolKey calldata key, address strategy) external;
-
-    error NotDynamicFee();
-    error RentTooLow();
-    error RentTooShort();
-    error PoolNotInitialized();
-    error InsufficientDeposit();
-    error CallerNotWinner();
-    error InvalidWinnerFeeShare();
 }
