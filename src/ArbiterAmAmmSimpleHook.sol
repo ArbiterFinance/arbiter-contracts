@@ -26,7 +26,7 @@ import {IArbiterAmAmmHarbergerLease} from "./interfaces/IArbiterAmAmmHarbergerLe
 import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-/// TODO decide on the blockNumber storage size uint32 / uint48 / uint64
+// TODO decide on the blockNumber storage size uint32 / uint48 / uint64
 
 uint8 constant DEFAULT_WINNER_FEE_SHARE = 6; // 6/127 ~= 4.72%
 uint8 constant DEFAULT_GET_SWAP_FEE_LOG = 13; // 2^13 = 8192
@@ -428,9 +428,9 @@ contract ArbiterAmAmmSimpleHook is
         }
 
         // set up new rent
-        slot1.setRemainingRent(requiredDeposit);
-        slot1.setShouldChangeStrategy(true);
-        slot1.setRentPerBlock(rentPerBlock);
+        slot1 = slot1.setRemainingRent(requiredDeposit);
+        slot1 = slot1.setShouldChangeStrategy(true);
+        slot1 = slot1.setRentPerBlock(rentPerBlock);
 
         poolSlot1[key.toId()] = slot1;
         winners[key.toId()] = msg.sender;
