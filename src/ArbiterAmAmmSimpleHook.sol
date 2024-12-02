@@ -121,9 +121,8 @@ contract ArbiterAmAmmSimpleHook is
         // Pool must have dynamic fee flag set. This is so we can override the LP fee in `beforeSwap`.
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
 
-        AuctionSlot0 slot0 = AuctionSlot0.wrap(bytes32(0));
-
-        slot0
+        AuctionSlot0 slot0 = AuctionSlot0
+            .wrap(bytes32(0))
             .setStrategyAddress(address(0))
             .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
             .setWinnerFeeShare(DEFAULT_WINNER_FEE_SHARE)
@@ -132,6 +131,29 @@ contract ArbiterAmAmmSimpleHook is
             .setOverbidFactor(DEFAULT_OVERBID_FACTOR)
             .setTransitionBlocks(DEFAULT_TRANSITION_BLOCKS)
             .setMinRentBlocks(DEFAULT_MINIMUM_RENT_BLOCKS);
+        console.log(
+            "[beforeInitialize] strategyAddress",
+            slot0.strategyAddress()
+        );
+        console.log(
+            "[beforeInitialize] strategyGasLimit",
+            slot0.strategyGasLimit()
+        );
+        console.log(
+            "[beforeInitialize] winnerFeeShare",
+            slot0.winnerFeeSharePart()
+        );
+        console.log("[beforeInitialize] maxSwapFee", slot0.maxSwapFee());
+        console.log(
+            "[beforeInitialize] defaultSwapFee",
+            slot0.defaultSwapFee()
+        );
+        console.log("[beforeInitialize] overbidFactor", slot0.overbidFactor());
+        console.log(
+            "[beforeInitialize] transitionBlocks",
+            slot0.transitionBlocks()
+        );
+        console.log("[beforeInitialize] minRentBlocks", slot0.minRentBlocks());
 
         poolSlot0[key.toId()] = slot0;
         console.log("[beforeInitialize] beforeInitialize end");
@@ -169,7 +191,7 @@ contract ArbiterAmAmmSimpleHook is
         address strategy = slot0.strategyAddress();
         uint24 fee = slot0.defaultSwapFee();
         // If no strategy is set, the swap fee is just set to the default value
-        console.log("[beforeSwap] setting fee strategy");
+        console.log("[beforeSwap] calling strategy");
         if (strategy == address(0)) {
             console.log("[beforeSwap] no strategy - setting default fee");
             console.log("[beforeSwap] beforeSwap end");
@@ -190,12 +212,17 @@ contract ArbiterAmAmmSimpleHook is
             )
         returns (uint24 _fee) {
             uint24 maxFee = slot0.maxSwapFee();
+            console.log("[beforeSwap] strategy call succeeded");
+            console.log("[beforeSwap] maxFee", maxFee);
+            console.log("[beforeSwap] _fee", _fee);
             if (_fee > maxFee) {
                 fee = maxFee;
             } else {
                 fee = _fee;
             }
-        } catch {}
+        } catch {
+            console.log("[beforeSwap] strategy call failed");
+        }
         console.log("[beforeSwap] after strategy call");
         console.log("[beforeSwap] fee", fee);
 
@@ -400,7 +427,15 @@ contract ArbiterAmAmmSimpleHook is
         }
 
         uint64 _currentRentEndBlock = slot1.rentEndBlock();
-        if (block.number < _currentRentEndBlock - slot0.transitionBlocks()) {
+        console.log("[overbid] _currentRentEndBlock", _currentRentEndBlock);
+        console.log("[overbid] block.number", block.number);
+        console.log("[overbid] transitionBlocks", slot0.transitionBlocks());
+        if (
+            _currentRentEndBlock == 0 ||
+            block.number < _currentRentEndBlock - slot0.transitionBlocks()
+        ) {
+            console.log("[overbid] overbidFactor", slot0.overbidFactor());
+            console.log("[overbid] rentPerBlock", slot1.rentPerBlock());
             uint96 minimumRentPerBlock = uint96(
                 (slot1.rentPerBlock() * slot0.overbidFactor()) / 127
             );
@@ -420,7 +455,9 @@ contract ArbiterAmAmmSimpleHook is
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
         uint120 requiredDeposit = rentPerBlock * rentBlockLength;
         unchecked {
+            console.log("[overbid] requiredDeposit", requiredDeposit);
             uint256 availableDeposit = deposits[msg.sender][currency];
+            console.log("[overbid] availableDeposit", availableDeposit);
             if (availableDeposit < requiredDeposit) {
                 revert InsufficientDeposit();
             }
@@ -428,11 +465,13 @@ contract ArbiterAmAmmSimpleHook is
         }
 
         // set up new rent
-        slot1 = slot1.setRemainingRent(requiredDeposit);
-        slot1 = slot1.setShouldChangeStrategy(true);
-        slot1 = slot1.setRentPerBlock(rentPerBlock);
 
-        poolSlot1[key.toId()] = slot1;
+        poolSlot0[key.toId()] = slot0.setStrategyAddress(strategy);
+        poolSlot1[key.toId()] = slot1
+            .setRemainingRent(requiredDeposit)
+            .setShouldChangeStrategy(true)
+            .setRentPerBlock(rentPerBlock);
+        console.log(poolSlot1[key.toId()].rentPerBlock());
         winners[key.toId()] = msg.sender;
         winnerStrategies[key.toId()] = strategy;
         console.log("[overbid] overbid end");
@@ -539,15 +578,17 @@ contract ArbiterAmAmmSimpleHook is
         uint120 remainingRent = slot1.remainingRent();
 
         if (lastPaidBlock == uint32(block.number) || remainingRent == 0) {
-            console.log("[_payRent] rentData.lastPaidBlock == block.number");
+            console.log(
+                "[_payRent] rentData.lastPaidBlock == block.number || remainingRent == 0"
+            );
             return slot0;
         }
 
         // check if we need to change strategy
         if (slot1.shouldChangeStrategy()) {
             console.log("[_payRent] rentData.shouldChangeStrategy");
-            slot0.setStrategyAddress(winnerStrategies[key.toId()]);
-            slot1.setShouldChangeStrategy(false);
+            slot0 = slot0.setStrategyAddress(winnerStrategies[key.toId()]);
+            slot1 = slot1.setShouldChangeStrategy(false);
             poolSlot0[key.toId()] = slot0;
             console.log(
                 "[_payRent] Strategy changed to",
@@ -568,17 +609,17 @@ contract ArbiterAmAmmSimpleHook is
             rentAmount = remainingRent;
             winners[key.toId()] = address(0);
             winnerStrategies[key.toId()] = address(0);
-            slot1.setShouldChangeStrategy(true);
-            slot1.setRentPerBlock(0);
+            slot1 = slot1.setShouldChangeStrategy(true);
+            slot1 = slot1.setRentPerBlock(0);
         }
         console.log(
             "[_payRent] Rent period ended, resetting winner and strategy"
         );
 
-        slot1.setLastPaidBlock(uint32(block.number));
+        slot1 = slot1.setLastPaidBlock(uint32(block.number));
 
         unchecked {
-            slot1.setRemainingRent(remainingRent - rentAmount);
+            slot1 = slot1.setRemainingRent(remainingRent - rentAmount);
         }
 
         // pay the rent
