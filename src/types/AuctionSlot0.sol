@@ -54,7 +54,7 @@ library AuctionSlot0Library {
     uint8 internal constant DEFAULT_SWAP_FEE_OFFSET = 200;
     uint8 internal constant OVERBID_FACTOR_OFFSET = 216;
     uint8 internal constant TRANSITION_BLOCKS_OFFSET = 224;
-    uint8 internal constant MIN_RENT_BLOCKS_OFFSET = 232;
+    uint8 internal constant MIN_RENT_BLOCKS_OFFSET = 240;
 
     // #### GETTERS ####
     function strategyAddress(
@@ -194,7 +194,7 @@ library AuctionSlot0Library {
 
     function setDefaultSwapFee(
         AuctionSlot0 _packed,
-        uint24 _defaultSwapFee
+        uint16 _defaultSwapFee
     ) internal pure returns (AuctionSlot0 _result) {
         assembly ("memory-safe") {
             _result := or(
