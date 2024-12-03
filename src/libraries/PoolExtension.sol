@@ -41,14 +41,12 @@ library PoolExtension {
 
     /// @dev The state of a pool extension
     struct State {
-        int24 tick;
-        uint72 rewardsPerBlock;
         uint256 rewardsPerLiquidityCumulativeX128;
         uint128 liquidity;
+        int24 tick;
         mapping(int24 tick => TickInfo) ticks;
         mapping(int16 wordPos => uint256) tickBitmap;
         mapping(bytes32 positionKey => CLPosition.Info) positions;
-        uint32 lastUpdateBlock;
     }
 
     function getRewardsPerLiquidityInsideX128(
@@ -125,9 +123,6 @@ library PoolExtension {
 
     function initialize(State storage self, int24 tick) internal {
         self.tick = tick;
-        unchecked {
-            self.lastUpdateBlock = uint32(block.number); // Initialize the timestamp, allow overflow
-        }
     }
 
     struct ModifyLiquidityParams {
@@ -147,25 +142,13 @@ library PoolExtension {
         uint128 liquidityGrossAfterUpper;
     }
 
-    /// @notice Updates the cumulative rewards per liquidity for the pool from the last update block to the blockNumber
-    function updateCumulative(State storage self, uint32 blockNumber) internal {
-        unchecked {
-            // underflow happens only after block number overflows
-            // the substraction result is valid unless more than 2*2^32 blocks passed since last update
-            uint32 blocksElapsed = blockNumber - self.lastUpdateBlock;
-            if (blocksElapsed > 0) {
-                if (self.liquidity > 0) {
-                    self.rewardsPerLiquidityCumulativeX128 +=
-                        (uint256(blocksElapsed * self.rewardsPerBlock) << 128) /
-                        self.liquidity;
-                }
-            }
-            self.lastUpdateBlock = blockNumber;
-        }
-    }
-
-    function donate(State storage self, uint256 rewardsAmount) internal {
-        self.rewardsPerLiquidityCumulativeX128 += rewardsAmount;
+    function distributeRewards(
+        State storage self,
+        uint128 rewardsAmount
+    ) internal {
+        self.rewardsPerLiquidityCumulativeX128 +=
+            (uint256(rewardsAmount) << 128) /
+            self.liquidity;
     }
 
     /// @notice Effect changes to a position in a pool

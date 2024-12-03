@@ -6,7 +6,7 @@ import {ICLSubscriber} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLSubs
 
 /// @title Liquidity Per Second Tracker
 /// @notice This hook is used to track the liquidity per second of subscribed liquidity within pools like in V3.
-interface ILiquididityPerSecondTracker is ICLSubscriber {
+interface IRewardTracker is ICLSubscriber {
     /// @return The seconds per **subscribed** liquidity cumulative for the pool
     /// @param key The key of the pool to check
     function getRewardsPerLiquidityCumulativeX128(
