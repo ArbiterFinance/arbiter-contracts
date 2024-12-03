@@ -15,14 +15,14 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "pancake-v4-core/src/types
 import {ICLSubscriber} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLSubscriber.sol";
 
 import {PoolExtension} from "./libraries/PoolExtension.sol";
-import {ILiquididityPerSecondTracker} from "./interfaces/ILiquididityPerSecondTracker.sol";
+import {IRewardTracker} from "./interfaces/IRewardTracker.sol";
 import {PositionExtension} from "./libraries/PositionExtension.sol";
 import {CLPool} from "pancake-v4-core/src/pool-cl/libraries/CLPool.sol";
 import {CLPoolGetters} from "pancake-v4-core/src/pool-cl/libraries/CLPoolGetters.sol";
 import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
+abstract contract RewardTracker is IRewardTracker {
     using PoolExtension for PoolExtension.State;
     using PositionExtension for PositionExtension.State;
     using PoolIdLibrary for PoolKey;
@@ -42,98 +42,41 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
         _;
     }
 
-    constructor(
-        ICLPoolManager _poolManager,
-        ICLPositionManager _positionManager
-    ) CLBaseHook(_poolManager) {
+    constructor(ICLPositionManager _positionManager) {
         positionManager = _positionManager;
     }
 
-    function _internalChangeRewardRate(
-        PoolId poolId,
-        uint72 rewardRate,
-        uint32 blockNumber
+    // @dev this should be called before any rewards are distributed
+    function _initialize(PoolId id, int24 tick) internal {
+        pools[id].initialize(tick);
+    }
+
+    // @dev call it only after the pool was initialized
+    function _distributeReward(PoolId id, uint128 rewards) internal {
+        pools[id].distributeRewards(rewards);
+    }
+
+    // @dev call when the tick that receives rewards changes
+    function _changeActiveTick(
+        PoolId id,
+        int24 newActiveTick,
+        int24 tickSpacing
     ) internal {
-        pools[poolId].updateCumulative(blockNumber);
-        pools[poolId].rewardsPerBlock = rewardRate;
-    }
-
-    ////TODO
-    // whenever we updateReward we must first check if the rent hasnt already finished
-    // for example if the alst update was 10 blocks ago and rent finished 5 block ago
-    // we must only update reward for 5 block and then set reward to 0
-
-    //////////////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////// Hooks Implementation ////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////////
-
-    function getHooksRegistrationBitmap()
-        external
-        pure
-        override
-        returns (uint16)
-    {
-        return
-            _hooksRegistrationBitmapFrom(
-                Permissions({
-                    beforeInitialize: false,
-                    afterInitialize: true,
-                    beforeAddLiquidity: false,
-                    afterAddLiquidity: false,
-                    beforeRemoveLiquidity: false,
-                    afterRemoveLiquidity: false,
-                    beforeSwap: false,
-                    afterSwap: true,
-                    beforeDonate: false,
-                    afterDonate: false,
-                    beforeSwapReturnsDelta: false,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
-                })
-            );
-    }
-    function afterInitialize(
-        address,
-        PoolKey calldata key,
-        uint160,
-        int24 tick
-    ) external override returns (bytes4) {
-        pools[key.toId()].initialize(tick);
-        return this.afterInitialize.selector;
-    }
-
-    function afterSwap(
-        address,
-        PoolKey calldata key,
-        ICLPoolManager.SwapParams calldata,
-        BalanceDelta,
-        bytes calldata
-    ) external override returns (bytes4, int128) {
-        _afterSwapTracker(key);
-        return (this.afterSwap.selector, 0);
-    }
-
-    function _afterSwapTracker(PoolKey calldata key) internal {
-        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
-        PoolId id = key.toId();
-        int tickBeforeSwap = pools[id].tick;
-        if (tickBeforeSwap != tick) {
-            pools[key.toId()].updateCumulative(uint32(block.number));
-            pools[id].crossToActiveTick(key.parameters.getTickSpacing(), tick);
-        }
+        pools[id].crossToActiveTick(newActiveTick, tickSpacing);
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////// ISubscriber Implementation //////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////
 
+    function _beforeOnSubscribeTracker(uint256 tokenId) internal virtual;
+
     function _onSubscribeTracker(uint256 tokenId) internal {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
 
-        pools[poolKey.toId()].updateCumulative(uint32(block.number));
+        _beforeOnSubscribeTracker(tokenId);
         pools[poolKey.toId()].modifyLiquidity(
             PoolExtension.ModifyLiquidityParams({
                 tickLower: positionInfo.tickLower(),
@@ -159,12 +102,14 @@ contract SoloTracker is CLBaseHook, ILiquididityPerSecondTracker {
         _onSubscribeTracker(tokenId);
     }
 
+    function _beforeOnUnubscribeTracker(uint256 tokenId) internal virtual;
+
     function _onUnubscribeTracker(uint256 tokenId) internal {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
 
-        pools[poolKey.toId()].updateCumulative(uint32(block.number));
+        _beforeOnUnubscribeTracker(tokenId);
         pools[poolKey.toId()].modifyLiquidity(
             PoolExtension.ModifyLiquidityParams({
                 tickLower: positionInfo.tickLower(),

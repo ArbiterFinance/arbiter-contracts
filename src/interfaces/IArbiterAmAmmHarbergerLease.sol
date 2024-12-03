@@ -22,7 +22,7 @@ interface IArbiterAmAmmHarbergerLease {
     ) external view returns (uint64);
 
     /// @return The required factor by which an overbidding rent must exceed the current rent, unless the current rent finishes in fewer than TRANSITION_BLOCKS.
-    function rentFactor(PoolKey calldata key) external view returns (uint8);
+    function rentFactor(PoolKey calldata key) external view returns (uint32);
 
     /// @return The number of blocks before the end of the rent when any bid is overbidding the current rent
     function transitionBlocks(
@@ -35,7 +35,9 @@ interface IArbiterAmAmmHarbergerLease {
     ) external view returns (uint256);
 
     /// @return The percentage of the swap fee that will be paid to the winner
-    function winnerFeeShare(PoolKey calldata key) external view returns (uint8);
+    function winnerFeeShare(
+        PoolKey calldata key
+    ) external view returns (uint16);
 
     /// @return The deposit of the account for the asset
     /// @param asset The address of the ERC20 to check
