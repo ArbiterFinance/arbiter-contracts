@@ -432,6 +432,7 @@ contract ArbiterAmAmmSimpleHook is
         console.log("[overbid] transitionBlocks", slot0.transitionBlocks());
         if (
             _currentRentEndBlock == 0 ||
+            // _currentRentEndBlock < slot0
             block.number < _currentRentEndBlock - slot0.transitionBlocks()
         ) {
             console.log("[overbid] overbidFactor", slot0.overbidFactor());
@@ -468,6 +469,7 @@ contract ArbiterAmAmmSimpleHook is
 
         poolSlot0[key.toId()] = slot0.setStrategyAddress(strategy);
         poolSlot1[key.toId()] = slot1
+            .setLastPaidBlock(uint32(block.number))
             .setRemainingRent(requiredDeposit)
             .setShouldChangeStrategy(true)
             .setRentPerBlock(rentPerBlock);
@@ -577,10 +579,14 @@ contract ArbiterAmAmmSimpleHook is
         uint32 lastPaidBlock = slot1.lastPaidBlock();
         uint120 remainingRent = slot1.remainingRent();
 
-        if (lastPaidBlock == uint32(block.number) || remainingRent == 0) {
-            console.log(
-                "[_payRent] rentData.lastPaidBlock == block.number || remainingRent == 0"
-            );
+        if (lastPaidBlock == uint32(block.number)) {
+            console.log("[_payRent] rentData.lastPaidBlock == block.number");
+            return slot0;
+        }
+        if (remainingRent == 0) {
+            slot1 = slot1.setLastPaidBlock(uint32(block.number));
+            poolSlot1[key.toId()] = slot1;
+            console.log("[_payRent] remainingRent == 0");
             return slot0;
         }
 

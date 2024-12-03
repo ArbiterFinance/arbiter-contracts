@@ -146,6 +146,7 @@ library AuctionSlot1Library {
             return _lastPaidBlock;
         } else
             return
-                _lastPaidBlock + uint64(remainingRent(_packed) / _rentPerBlock);
+                _lastPaidBlock +
+                uint64((remainingRent(_packed) / _rentPerBlock) + 1);
     }
 }

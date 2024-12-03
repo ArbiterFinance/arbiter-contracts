@@ -146,6 +146,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
     function testBiddingAndRentPayment() public {
         transferToUser1AndDepositAs(10_000e18);
+        //offset blocks
+        moveBlockBy(100);
 
         // User1 overbids
         vm.prank(user1);
@@ -155,17 +157,20 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             uint48(block.number + DEFAULT_MINIMUM_RENT_BLOCKS),
             address(0) // strategy (none)
         );
+        AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
+        uint120 startingRent = slot1.remainingRent();
 
         address winner = arbiterHook.winner(key);
         assertEq(winner, user1, "Winner should be user1 after overbidding");
 
         moveBlockBy(5);
+        addLiquidity(key, 1, 1, -60, 60, address(this));
 
-        AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
+        slot1 = arbiterHook.poolSlot1(id);
         uint120 remainingRent = slot1.remainingRent();
-        assertLt(
-            remainingRent,
-            1000e18,
+        assertEq(
+            startingRent - remainingRent,
+            5 * 10e18,
             "Remaining rent should be less than initial deposit"
         );
 
@@ -512,7 +517,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
                 hookData: ZERO_BYTES
             })
         );
-        moveBlockBy(298);
+        moveBlockBy(DEFAULT_MINIMUM_RENT_BLOCKS - 1);
 
         uint48 currentBlock = uint48(block.number);
         AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
@@ -520,7 +525,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         assertEq(
             currentBlock,
             rentEndBlockFromContract,
-            "Rent end block mismatch"
+            "currentBlock vs rent end block mismatch"
         );
 
         moveBlockBy(1);
@@ -797,6 +802,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint48 desiredRentEndBlock = uint48(
             block.number + DEFAULT_MINIMUM_RENT_BLOCKS
         );
+        console.log("current block", block.number);
+        console.log("desiredRentEndBlock", desiredRentEndBlock);
         MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
 
         transferToUser1AndDepositAs(10_000e18);
@@ -807,6 +814,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         slot1 = arbiterHook.poolSlot1(id);
         uint64 currentRentEndBlock = slot1.rentEndBlock();
+        console.log("current block", block.number);
+        console.log("currentRentEndBlock", currentRentEndBlock);
         assertEq(
             currentRentEndBlock,
             desiredRentEndBlock,
@@ -977,9 +986,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         // User1 overbids
         vm.prank(user1);
-        console.log("current block", block.number);
-        console.log("rent end block", uint48(block.number + 300));
-        arbiterHook.overbid(key, 10e18, uint48(block.number + 300), address(0));
+        arbiterHook.overbid(
+            key,
+            10e18,
+            uint48(block.number + DEFAULT_MINIMUM_RENT_BLOCKS),
+            address(0)
+        );
 
         moveBlockBy(10);
 
