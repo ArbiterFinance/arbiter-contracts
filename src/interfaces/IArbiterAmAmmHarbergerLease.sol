@@ -80,7 +80,7 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param key The key of the pool to check
     function currentRentEndBlock(
         PoolKey calldata key
-    ) external view returns (uint48);
+    ) external view returns (uint32);
 
     /// @notice Transfers ERC20 from msg.sender into this contract to be later used by msg.sender for bidding
     /// @param asset The address of the ERC20 to deposit
@@ -99,7 +99,7 @@ interface IArbiterAmAmmHarbergerLease {
     function overbid(
         PoolKey calldata key,
         uint80 rentPerBlock,
-        uint48 rentEndBlock,
+        uint32 rentEndBlock,
         address strategy
     ) external;
 

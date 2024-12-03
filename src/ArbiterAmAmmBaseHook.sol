@@ -107,7 +107,7 @@ abstract contract ArbiterAmAmmBaseHook is
     function getFeeGasLimit(
         PoolKey calldata key
     ) external view returns (uint256) {
-        return poolSlot1[key.toId()].strategyGasLimit();
+        return poolSlot0[key.toId()].strategyGasLimit();
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -122,65 +122,49 @@ abstract contract ArbiterAmAmmBaseHook is
         address asset,
         address account
     ) external view override returns (uint256) {
-        uint256 depositAmount = deposits[account][Currency.wrap(asset)];
-
-        return depositAmount;
+        return deposits[account][Currency.wrap(asset)];
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function biddingCurrency(
         PoolKey calldata key
     ) external view override returns (address) {
-        address currency = Currency.unwrap(_getPoolRentCurrency(key));
-
-        return currency;
+        return Currency.unwrap(_getPoolRentCurrency(key));
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function activeStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        address strategy = poolSlot0[key.toId()].strategyAddress();
-
-        return strategy;
+        return poolSlot0[key.toId()].strategyAddress();
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function winnerStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        address strategy = winnerStrategies[key.toId()];
-
-        return strategy;
+        return winnerStrategies[key.toId()];
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function winner(
         PoolKey calldata key
     ) external view override returns (address) {
-        address winnerAddr = winners[key.toId()];
-
-        return winnerAddr;
+        return winners[key.toId()];
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function currentRentPerBlock(
         PoolKey calldata key
     ) external view override returns (uint96) {
-        uint96 rent = poolSlot0[key.toId()].rentPerBlock();
-
-        return rent;
+        return poolSlot1[key.toId()].rentPerBlock();
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function currentRentEndBlock(
         PoolKey calldata key
-    ) public view override returns (uint48) {
-        uint64 endBlock = poolSlot0[key.toId()].rentEndBlock(
-            poolSlot1[key.toId()]
-        );
-
-        return uint48(endBlock);
+    ) public view override returns (uint32) {
+        return poolSlot1[key.toId()].rentEndBlock();
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -194,7 +178,7 @@ abstract contract ArbiterAmAmmBaseHook is
     function overbid(
         PoolKey calldata key,
         uint80 rentPerBlock,
-        uint48 rentEndBlock,
+        uint32 rentEndBlock,
         address strategy
     ) external {
         PoolId poolId = key.toId();
@@ -206,23 +190,28 @@ abstract contract ArbiterAmAmmBaseHook is
         AuctionSlot0 slot0 = poolSlot0[poolId];
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
-        uint64 minimumEndBlock = uint64(block.number) + _minRentBlocks;
-        if (rentEndBlock < minimumEndBlock) {
-            revert RentTooShort();
+        unchecked {
+            uint32 minimumEndBlock = uint32(block.number) + _minRentBlocks;
+            require(
+                rentEndBlock >= minimumEndBlock ||
+                    rentEndBlock < uint32(block.number),
+                RentTooShort()
+            );
         }
 
-        uint64 _currentRentEndBlock = slot0.rentEndBlock(slot1);
+        uint64 _currentRentEndBlock = slot1.rentEndBlock();
 
-        if (
-            _currentRentEndBlock == 0 ||
-            // _currentRentEndBlock < slot0
-            block.number < _currentRentEndBlock - _transitionBlocks
-        ) {
-            uint96 minimumRentPerBlock = uint96(
-                (slot0.rentPerBlock() * _overbidFactor) / 127
-            );
-            if (rentPerBlock <= minimumRentPerBlock) {
-                revert RentTooLow();
+        unchecked {
+            if (
+                uint256(uint32(block.number)) + _transitionBlocks <
+                _currentRentEndBlock
+            ) {
+                uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
+                    (uint120(slot1.rentPerBlock()) * _overbidFactor) /
+                    type(uint16).max;
+                if (uint120(rentPerBlock) <= minimumRentPerBlock) {
+                    revert RentTooLow();
+                }
             }
         }
 
@@ -247,13 +236,11 @@ abstract contract ArbiterAmAmmBaseHook is
 
         // set up new rent
 
-        poolSlot0[poolId] = slot0.setStrategyAddress(strategy).setRentPerBlock(
-            rentPerBlock
-        );
+        poolSlot0[poolId] = slot0.setShouldChangeStrategy(true);
         poolSlot1[poolId] = slot1
-            .setLastPaidBlock(uint32(block.number))
             .setRemainingRent(requiredDeposit)
-            .setShouldChangeStrategy(true);
+            .setLastPaidBlock(uint32(block.number))
+            .setRentPerBlock(rentPerBlock);
 
         winners[poolId] = msg.sender;
         winnerStrategies[poolId] = strategy;
@@ -280,12 +267,12 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolId poolId = key.toId();
         if (
             msg.sender != winners[poolId] ||
-            currentRentEndBlock(key) <= block.number
+            poolSlot1[key.toId()].remainingRent() == 0
         ) {
             revert CallerNotWinner();
         }
         winnerStrategies[poolId] = strategy;
-        poolSlot1[poolId].setShouldChangeStrategy(true);
+        poolSlot0[poolId].setShouldChangeStrategy(true);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
