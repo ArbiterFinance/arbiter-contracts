@@ -72,7 +72,7 @@
 //     struct RentData {
 //         uint128 remainingRent;
 //         uint48 lastPaidBlock;
-//         uint48 rentEndBlock;
+//         uint32 rentEndBlock;
 //         bool shouldChangeStrategy;
 //         uint24 rentConfig; // could store additional data
 //     }
@@ -411,7 +411,7 @@
 //     function overbid(
 //         PoolKey calldata key,
 //         uint96 rentPerBlock,
-//         uint48 rentEndBlock,
+//         uint32 rentEndBlock,
 //         address strategy
 //     ) external {
 //         console.log("[overbid] overbid start");

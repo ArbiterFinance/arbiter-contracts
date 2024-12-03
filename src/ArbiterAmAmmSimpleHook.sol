@@ -110,13 +110,10 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
         PoolId poolId = key.toId();
 
-        poolSlot1[poolId] = AuctionSlot1.wrap(bytes32(0)).setStrategyGasLimit(
-            DEFAULT_GET_SWAP_FEE_LOG
-        );
-
-        poolSlot0[poolId] = AuctionSlot0.wrap(bytes32(0)).setWinnerFeeSharePart(
-            DEFAULT_WINNER_FEE_SHARE
-        );
+        poolSlot0[poolId] = AuctionSlot0
+            .wrap(bytes32(0))
+            .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
+            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG);
 
         return this.beforeInitialize.selector;
     }
@@ -221,10 +218,9 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         PoolId poolId = key.toId();
         (, int24 tick, , ) = poolManager.getSlot0(poolId);
 
-        AuctionSlot1 slot1 = poolSlot1[poolId];
-        if (tick != slot1.lastActiveTick()) {
+        AuctionSlot0 slot0 = poolSlot0[poolId];
+        if (tick != slot0.lastActiveTick()) {
             _payRent(key);
-            slot1.setLastActiveTick(tick);
         }
 
         return (this.afterSwap.selector, 0);
@@ -257,14 +253,14 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         if (remainingRent == 0) {
             slot1 = slot1.setLastPaidBlock(uint32(block.number));
             poolSlot1[poolId] = slot1;
-
             return;
         }
 
         // check if we need to change strategy
-        if (slot1.shouldChangeStrategy()) {
-            slot0 = slot0.setStrategyAddress(winnerStrategies[poolId]);
-            slot1 = slot1.setShouldChangeStrategy(false);
+        if (slot0.shouldChangeStrategy()) {
+            slot0 = slot0
+                .setStrategyAddress(winnerStrategies[poolId])
+                .setShouldChangeStrategy(false);
         }
 
         uint32 blocksElapsed;
@@ -272,16 +268,14 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
             blocksElapsed = uint32(block.number) - lastPaidBlock;
         }
 
-        // overflow unlikely to happen, rentPerBlock is capped at 2^96
-        // for overflow to happen 2^128 / rentPerBlock > 2^24 = 194 days
-        uint128 rentAmount = slot0.rentPerBlock() * blocksElapsed;
+        uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
         if (rentAmount > remainingRent) {
             rentAmount = remainingRent;
             winners[poolId] = address(0);
             winnerStrategies[poolId] = address(0);
-            slot1 = slot1.setShouldChangeStrategy(true);
-            slot0 = slot0.setRentPerBlock(0);
+            slot0 = slot0.setShouldChangeStrategy(true);
+            slot1 = slot1.setRentPerBlock(0);
         }
 
         slot1 = slot1.setLastPaidBlock(uint32(block.number));

@@ -4,23 +4,16 @@ pragma solidity ^0.8.0;
 import {AuctionSlot1Library, AuctionSlot1} from "./AuctionSlot1.sol";
 
 /**
- * @dev AuctionSlot0 is a packed version of solidity structure.
- * Using the packaged version saves gas by not storing the structure fields in memory slots.
+ * @dev AuctionSlot0 is a tightly packed data structure that holds multiple parameters
+ * related to the auction's configuration and state.
  *
- * Layout:
- * 96 bits rent per block | 160 bits strategy contract address
- *
- * Fields in the direction from the least significant bit:
- *
- * The strategy contract address (160bits)
- * is the address of the strategy contract that will be used to determine the swap fee.
- *
- * Rent per block (80bits)
- * is the amount of rent that is paid per block.
- *
- * Winner fee share (16bits)
- * is the swapp fee part out of  that the winner collects. rest is distributed normally to the LPs.
- *
+ * - [0..160): `strategy address` (160 bits) - The address of the current strategy contract.
+ * - [160..168): `should change strategy` (8 bits) - A boolean flag indicating whether a new strategy should be applied.
+ * - [168..192): `last active tick` (24 bits) - The tick at which the auction was last active.
+ * - [192..208): `winner fee part` (16 bits) - The portion of the fee paid to the auction winner, expressed in basis points.
+ * - [208..216): `strategy gas limit` (8 bits) - The maximum gas allocation for executing the strategy.
+ * - [216..232): `default swap fee` (16 bits) - The default fee applied to swaps in basis points.
+ * - [232..256): `maximum swap fee` (24 bits) - The maximum allowable fee for swaps in basis points.
  */
 type AuctionSlot0 is bytes32;
 
@@ -30,11 +23,17 @@ using AuctionSlot0Library for AuctionSlot0 global;
 library AuctionSlot0Library {
     uint160 internal constant MASK_160_BITS =
         0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    uint80 internal constant MASK_80_BITS = 0xFFFFFFFFFFFFFFFFFFFF;
+    uint8 internal constant MASK_8_BITS = 0xFF;
     uint16 internal constant MASK_16_BITS = 0xFFFF;
+    uint24 internal constant MASK_24_BITS = 0xFFFFFF;
 
-    uint8 internal constant RENT_PER_BLOCK_OFFSET = 160;
-    uint8 internal constant WINNER_FEE_SHARE_OFFSET = 240;
+    uint8 internal constant STRATEGY_ADDRESS_OFFSET = 0;
+    uint8 internal constant SHOULD_CHANGE_STRATEGY_OFFSET = 160;
+    uint8 internal constant LAST_ACTIVE_TICK_OFFSET = 168;
+    uint8 internal constant WINNER_FEE_PART_OFFSET = 192;
+    uint8 internal constant STRATEGY_GAS_LIMIT_OFFSET = 208;
+    uint8 internal constant DEFAULT_SWAP_FEE_OFFSET = 216;
+    uint8 internal constant MAXIMUM_SWAP_FEE_OFFSET = 232;
 
     // #### GETTERS ####
     function strategyAddress(
@@ -45,24 +44,68 @@ library AuctionSlot0Library {
         }
     }
 
-    function rentPerBlock(
+    function shouldChangeStrategy(
         AuctionSlot0 _packed
-    ) internal pure returns (uint80 _rentPerBlock) {
+    ) internal pure returns (bool _shouldChangeStrategy) {
         assembly ("memory-safe") {
-            _rentPerBlock := and(
-                MASK_80_BITS,
-                shr(RENT_PER_BLOCK_OFFSET, _packed)
+            _shouldChangeStrategy := and(
+                MASK_8_BITS,
+                shr(SHOULD_CHANGE_STRATEGY_OFFSET, _packed)
+            )
+        }
+    }
+
+    function lastActiveTick(
+        AuctionSlot0 _packed
+    ) internal pure returns (int24 _lastActiveTick) {
+        assembly ("memory-safe") {
+            _lastActiveTick := signextend(
+                2,
+                shr(LAST_ACTIVE_TICK_OFFSET, _packed)
             )
         }
     }
 
     function winnerFeeSharePart(
         AuctionSlot0 _packed
-    ) internal pure returns (uint16 _winnerFeeShare) {
+    ) internal pure returns (uint16 _winnerFeeSharePart) {
         assembly ("memory-safe") {
-            _winnerFeeShare := and(
+            _winnerFeeSharePart := and(
                 MASK_16_BITS,
-                shr(WINNER_FEE_SHARE_OFFSET, _packed)
+                shr(WINNER_FEE_PART_OFFSET, _packed)
+            )
+        }
+    }
+
+    function strategyGasLimit(
+        AuctionSlot0 _packed
+    ) internal pure returns (uint8 _strategyGasLimit) {
+        assembly ("memory-safe") {
+            _strategyGasLimit := and(
+                MASK_8_BITS,
+                shr(STRATEGY_GAS_LIMIT_OFFSET, _packed)
+            )
+        }
+    }
+
+    function defaultSwapFee(
+        AuctionSlot0 _packed
+    ) internal pure returns (uint16 _defaultSwapFee) {
+        assembly ("memory-safe") {
+            _defaultSwapFee := and(
+                MASK_16_BITS,
+                shr(DEFAULT_SWAP_FEE_OFFSET, _packed)
+            )
+        }
+    }
+
+    function maximumSwapFee(
+        AuctionSlot0 _packed
+    ) internal pure returns (uint24 _maximumSwapFee) {
+        assembly ("memory-safe") {
+            _maximumSwapFee := and(
+                MASK_24_BITS,
+                shr(MAXIMUM_SWAP_FEE_OFFSET, _packed)
             )
         }
     }
@@ -80,41 +123,87 @@ library AuctionSlot0Library {
         }
     }
 
-    function setRentPerBlock(
+    function setShouldChangeStrategy(
         AuctionSlot0 _packed,
-        uint80 _rentPerBlock
+        bool _shouldChangeStrategy
     ) internal pure returns (AuctionSlot0 _result) {
         assembly ("memory-safe") {
             _result := or(
-                and(not(MASK_80_BITS), _packed),
-                shl(RENT_PER_BLOCK_OFFSET, _rentPerBlock)
+                and(
+                    not(shl(SHOULD_CHANGE_STRATEGY_OFFSET, MASK_8_BITS)),
+                    _packed
+                ),
+                shl(
+                    SHOULD_CHANGE_STRATEGY_OFFSET,
+                    and(MASK_8_BITS, _shouldChangeStrategy)
+                )
+            )
+        }
+    }
+
+    function setLastActiveTick(
+        AuctionSlot0 _packed,
+        int24 _lastActiveTick
+    ) internal pure returns (AuctionSlot0 _result) {
+        assembly ("memory-safe") {
+            _result := or(
+                and(not(shl(LAST_ACTIVE_TICK_OFFSET, MASK_24_BITS)), _packed),
+                shl(LAST_ACTIVE_TICK_OFFSET, and(MASK_24_BITS, _lastActiveTick))
             )
         }
     }
 
     function setWinnerFeeSharePart(
         AuctionSlot0 _packed,
-        uint16 _winnerFeeShare
+        uint16 _winnerFeeSharePart
     ) internal pure returns (AuctionSlot0 _result) {
         assembly ("memory-safe") {
             _result := or(
-                and(not(shl(WINNER_FEE_SHARE_OFFSET, MASK_16_BITS)), _packed),
-                shl(WINNER_FEE_SHARE_OFFSET, and(MASK_16_BITS, _winnerFeeShare))
+                and(not(shl(WINNER_FEE_PART_OFFSET, MASK_16_BITS)), _packed),
+                shl(
+                    WINNER_FEE_PART_OFFSET,
+                    and(MASK_16_BITS, _winnerFeeSharePart)
+                )
             )
         }
     }
 
-    // #### UTILITIES ####
-    function rentEndBlock(
+    function setStrategyGasLimit(
         AuctionSlot0 _packed,
-        AuctionSlot1 _packed1
-    ) internal pure returns (uint32) {
-        uint96 _rentPerBlock = _packed.rentPerBlock();
-        if (_rentPerBlock == 0) {
-            return _packed1.lastPaidBlock();
+        uint8 _strategyGasLimit
+    ) internal pure returns (AuctionSlot0 _result) {
+        assembly ("memory-safe") {
+            _result := or(
+                and(not(shl(STRATEGY_GAS_LIMIT_OFFSET, MASK_8_BITS)), _packed),
+                shl(
+                    STRATEGY_GAS_LIMIT_OFFSET,
+                    and(MASK_8_BITS, _strategyGasLimit)
+                )
+            )
         }
-        return
-            _packed1.lastPaidBlock() +
-            uint32(_packed1.remainingRent() / _rentPerBlock);
+    }
+
+    function setDefaultSwapFee(
+        AuctionSlot0 _packed,
+        uint16 _defaultSwapFee
+    ) internal pure returns (AuctionSlot0 _result) {
+        assembly ("memory-safe") {
+            _result := or(
+                and(not(shl(DEFAULT_SWAP_FEE_OFFSET, MASK_16_BITS)), _packed),
+                shl(DEFAULT_SWAP_FEE_OFFSET, and(MASK_16_BITS, _defaultSwapFee))
+            )
+        }
+    }
+
+    function setMaximumSwapFee(
+        AuctionSlot0 _packed,
+        uint24 _maximumSwapFee
+    ) internal pure returns (AuctionSlot0 _result) {
+        assembly ("memory-safe") {
+            _result := or(
+                and(not(shl(MAXIMUM_SWAP_FEE_OFFSET, MASK_24_BITS)), _packed),
+                shl(MAXIMUM_SWAP_FEE_OFFSET, and(MASK_24_BITS, _maximumSwapFee))
+            )
+        }
     }
 }
