@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
  * Using the packaged version saves gas by not storing the structure fields in memory slots.
  *
  * Layout:
- * 16 bits default swap fee | 24 bits maximum swap fee | 16 bits winner fee share | 8 strategy get fee gas limit | 7 bits FEE SPACE | 1 bit should change strategy | 24 bits  last active tick | 32 bits last paid block | 128 bits remaining rent
+ * 128 bits remaining rent | 32 bits last paid block | 24 bits last active tick | 1 bit should change strategy | 23 bits FREE SPACE | 8 bits strategy get fee gas limit | 24 bits maximum swap fee | 16 bits default swap fee
  *
  * Fields in the direction from the least significant bit:
  *
@@ -22,14 +22,11 @@ pragma solidity ^0.8.0;
  * Should change strategy (1 bits)
  * is a flag that indicates if the strategy should be changed.
  *
- * FREE SPACE (7 bits)
+ * FREE SPACE (23 bits)
  *
  * Strategy get fee gas limit (8bits)
  * is the log2 of the maximum amount of gas that can be used to call the strategy contract's getFee method.
  * for examples if the value is 18, the maximum amount of gas that can be used is 1 << 18.
- *
- * Winner fee share (16bits)
- * is the swapp fee part out of  that the winner collects. rest is distributed normally to the LPs.
  *
  * Maximum swap fee (24bits)
  * is the maximum swap fee that can be returned by the strategy contract - otherwise the default swap fee is used.
@@ -54,8 +51,7 @@ library AuctionSlot1Library {
     uint8 internal constant LAST_PAID_BLOCK_OFFSET = 128;
     uint8 internal constant LAST_ACTIVE_TICK_OFFSET = 160;
     uint8 internal constant SHOULD_CHANGE_STRATEGY_OFFSET = 184;
-    uint8 internal constant STRATEGY_GAS_LIMIT_OFFSET = 192;
-    uint8 internal constant WINNER_FEE_SHARE_OFFSET = 100;
+    uint8 internal constant STRATEGY_GAS_LIMIT_OFFSET = 208;
     uint8 internal constant MAX_SWAP_FEE_OFFSET = 216;
     uint8 internal constant DEFAULT_SWAP_FEE_OFFSET = 240;
 
@@ -108,17 +104,6 @@ library AuctionSlot1Library {
             _strategyGasLimit := and(
                 MASK_8_BITS,
                 shr(STRATEGY_GAS_LIMIT_OFFSET, _packed)
-            )
-        }
-    }
-
-    function winnerFeeSharePart(
-        AuctionSlot1 _packed
-    ) internal pure returns (uint16 _winnerFeeShare) {
-        assembly ("memory-safe") {
-            _winnerFeeShare := and(
-                MASK_16_BITS,
-                shr(WINNER_FEE_SHARE_OFFSET, _packed)
             )
         }
     }
@@ -208,18 +193,6 @@ library AuctionSlot1Library {
                     STRATEGY_GAS_LIMIT_OFFSET,
                     and(MASK_8_BITS, _strategyGasLimit)
                 )
-            )
-        }
-    }
-
-    function setWinnerFeeShare(
-        AuctionSlot1 _packed,
-        uint16 _winnerFeeShare
-    ) internal pure returns (AuctionSlot1 _result) {
-        assembly ("memory-safe") {
-            _result := or(
-                and(not(shl(WINNER_FEE_SHARE_OFFSET, MASK_16_BITS)), _packed),
-                shl(WINNER_FEE_SHARE_OFFSET, and(MASK_16_BITS, _winnerFeeShare))
             )
         }
     }

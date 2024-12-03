@@ -77,12 +77,9 @@ abstract contract ArbiterAmAmmBaseHook is
         uint32 minRentBlocks_,
         uint32 overbidFactor_
     ) CLBaseHook(_poolManager) Ownable(_initOwner) {
-        console.log("[Constructor] Constructor start");
-
         _transitionBlocks = transitionBlocks_;
         _minRentBlocks = minRentBlocks_;
         _overbidFactor = overbidFactor_;
-        console.log("[Constructor] Constructor end");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -117,7 +114,7 @@ abstract contract ArbiterAmAmmBaseHook is
     function winnerFeeShare(
         PoolKey calldata key
     ) external view returns (uint16) {
-        return poolSlot1[key.toId()].winnerFeeSharePart();
+        return poolSlot0[key.toId()].winnerFeeSharePart();
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -125,9 +122,8 @@ abstract contract ArbiterAmAmmBaseHook is
         address asset,
         address account
     ) external view override returns (uint256) {
-        console.log("[depositOf] depositOf start");
         uint256 depositAmount = deposits[account][Currency.wrap(asset)];
-        console.log("[depositOf] depositOf end");
+
         return depositAmount;
     }
 
@@ -135,9 +131,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function biddingCurrency(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("[biddingCurrency] biddingCurrency start");
         address currency = Currency.unwrap(_getPoolRentCurrency(key));
-        console.log("[biddingCurrency] biddingCurrency end");
+
         return currency;
     }
 
@@ -145,9 +140,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function activeStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("[activeStrategy] activeStrategy start");
         address strategy = poolSlot0[key.toId()].strategyAddress();
-        console.log("[activeStrategy] activeStrategy end");
+
         return strategy;
     }
 
@@ -155,9 +149,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function winnerStrategy(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("[winnerStrategy] winnerStrategy start");
         address strategy = winnerStrategies[key.toId()];
-        console.log("[winnerStrategy] winnerStrategy end");
+
         return strategy;
     }
 
@@ -165,9 +158,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function winner(
         PoolKey calldata key
     ) external view override returns (address) {
-        console.log("[winner] winner start");
         address winnerAddr = winners[key.toId()];
-        console.log("[winner] winner end");
+
         return winnerAddr;
     }
 
@@ -175,9 +167,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function currentRentPerBlock(
         PoolKey calldata key
     ) external view override returns (uint96) {
-        console.log("[rentPerBlock] rentPerBlock start");
         uint96 rent = poolSlot0[key.toId()].rentPerBlock();
-        console.log("[rentPerBlock] rentPerBlock end");
+
         return rent;
     }
 
@@ -185,43 +176,35 @@ abstract contract ArbiterAmAmmBaseHook is
     function currentRentEndBlock(
         PoolKey calldata key
     ) public view override returns (uint48) {
-        console.log("[rentEndBlock] rentEndBlock start");
         uint64 endBlock = poolSlot0[key.toId()].rentEndBlock(
             poolSlot1[key.toId()]
         );
-        console.log("[rentEndBlock] rentEndBlock end");
+
         return uint48(endBlock);
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
-        console.log("[deposit] deposit start");
-        console.log("[deposit] asset", asset);
-        console.log("[deposit] amount", amount);
         // Deposit 6909 claim tokens to Uniswap V4 PoolManager. The claim tokens are owned by this contract.
         vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
         deposits[msg.sender][Currency.wrap(asset)] += amount;
-        console.log("[deposit] deposit end");
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function overbid(
         PoolKey calldata key,
-        uint96 rentPerBlock,
+        uint80 rentPerBlock,
         uint48 rentEndBlock,
         address strategy
     ) external {
-        console.log("[overbid] overbid start");
-        console.log("[overbid] rentPerBlock", rentPerBlock);
-        console.log("[overbid] rentEndBlock", rentEndBlock);
-        console.log("[overbid] strategy", strategy);
-        (uint160 price, , , ) = poolManager.getSlot0(key.toId());
+        PoolId poolId = key.toId();
+        (uint160 price, , , ) = poolManager.getSlot0(poolId);
         if (price == 0) {
             revert PoolNotInitialized();
         }
 
-        AuctionSlot0 slot0 = poolSlot0[key.toId()];
-        AuctionSlot1 slot1 = poolSlot1[key.toId()];
+        AuctionSlot0 slot0 = poolSlot0[poolId];
+        AuctionSlot1 slot1 = poolSlot1[poolId];
 
         uint64 minimumEndBlock = uint64(block.number) + _minRentBlocks;
         if (rentEndBlock < minimumEndBlock) {
@@ -229,16 +212,12 @@ abstract contract ArbiterAmAmmBaseHook is
         }
 
         uint64 _currentRentEndBlock = slot0.rentEndBlock(slot1);
-        console.log("[overbid] _currentRentEndBlock", _currentRentEndBlock);
-        console.log("[overbid] block.number", block.number);
-        console.log("[overbid] transitionBlocks", _transitionBlocks);
+
         if (
             _currentRentEndBlock == 0 ||
             // _currentRentEndBlock < slot0
             block.number < _currentRentEndBlock - _transitionBlocks
         ) {
-            console.log("[overbid] overbidFactor", _overbidFactor);
-            console.log("[overbid] rentPerBlock", slot0.rentPerBlock());
             uint96 minimumRentPerBlock = uint96(
                 (slot0.rentPerBlock() * _overbidFactor) / 127
             );
@@ -252,15 +231,14 @@ abstract contract ArbiterAmAmmBaseHook is
         Currency currency = _getPoolRentCurrency(key);
 
         // refund the remaining rentPerBlock to the previous winner
-        deposits[winners[key.toId()]][currency] += slot1.remainingRent();
+        deposits[winners[poolId]][currency] += slot1.remainingRent();
 
         // charge the new winner
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
         uint120 requiredDeposit = rentPerBlock * rentBlockLength;
         unchecked {
-            console.log("[overbid] requiredDeposit", requiredDeposit);
             uint256 availableDeposit = deposits[msg.sender][currency];
-            console.log("[overbid] availableDeposit", availableDeposit);
+
             if (availableDeposit < requiredDeposit) {
                 revert InsufficientDeposit();
             }
@@ -269,24 +247,20 @@ abstract contract ArbiterAmAmmBaseHook is
 
         // set up new rent
 
-        poolSlot0[key.toId()] = slot0
-            .setStrategyAddress(strategy)
-            .setRentPerBlock(rentPerBlock);
-        poolSlot1[key.toId()] = slot1
+        poolSlot0[poolId] = slot0.setStrategyAddress(strategy).setRentPerBlock(
+            rentPerBlock
+        );
+        poolSlot1[poolId] = slot1
             .setLastPaidBlock(uint32(block.number))
             .setRemainingRent(requiredDeposit)
             .setShouldChangeStrategy(true);
-        console.log("[overbid] rent per block", slot0.rentEndBlock(slot1));
-        winners[key.toId()] = msg.sender;
-        winnerStrategies[key.toId()] = strategy;
-        console.log("[overbid] overbid end");
+
+        winners[poolId] = msg.sender;
+        winnerStrategies[poolId] = strategy;
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function withdraw(address asset, uint256 amount) external override {
-        console.log("[withdraw] withdraw start");
-        console.log("[withdraw] asset", asset);
-        console.log("[withdraw] amount", amount);
         uint256 depositAmount = deposits[msg.sender][Currency.wrap(asset)];
         unchecked {
             if (depositAmount < amount) {
@@ -296,7 +270,6 @@ abstract contract ArbiterAmAmmBaseHook is
         }
         // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
         vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
-        console.log("[withdraw] withdraw end");
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -304,16 +277,15 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolKey calldata key,
         address strategy
     ) external override {
-        console.log("[changeStrategy] changeStrategy start");
+        PoolId poolId = key.toId();
         if (
-            msg.sender != winners[key.toId()] ||
+            msg.sender != winners[poolId] ||
             currentRentEndBlock(key) <= block.number
         ) {
             revert CallerNotWinner();
         }
-        winnerStrategies[key.toId()] = strategy;
-        poolSlot1[key.toId()].setShouldChangeStrategy(true);
-        console.log("[changeStrategy] changeStrategy end");
+        winnerStrategies[poolId] = strategy;
+        poolSlot1[poolId].setShouldChangeStrategy(true);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -324,12 +296,8 @@ abstract contract ArbiterAmAmmBaseHook is
     function lockAcquired(
         bytes calldata rawData
     ) external override vaultOnly returns (bytes memory) {
-        console.log("[lockAcquired] lockAcquired start");
         CallbackData memory data = abi.decode(rawData, (CallbackData));
-        console.log("[lockAcquired] data.currency", data.currency);
-        console.log("[lockAcquired] data.sender", data.sender);
-        console.log("[lockAcquired] data.depositAmount", data.depositAmount);
-        console.log("[lockAcquired] data.withdrawAmount", data.withdrawAmount);
+
         if (data.depositAmount > 0) {
             vault.sync(Currency.wrap(data.currency));
             // Transfer tokens directly from msg.sender to the vault
@@ -358,7 +326,7 @@ abstract contract ArbiterAmAmmBaseHook is
             );
             vault.settle();
         }
-        console.log("[lockAcquired] lockAcquired end");
+
         return "";
     }
 
@@ -366,9 +334,7 @@ abstract contract ArbiterAmAmmBaseHook is
     ///////////////////////////////////// Internal ////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    function _payRent(
-        PoolKey memory key
-    ) internal virtual returns (AuctionSlot0 slot0);
+    function _payRent(PoolKey memory key) internal virtual;
 
     function _getPoolRentCurrency(
         PoolKey memory key

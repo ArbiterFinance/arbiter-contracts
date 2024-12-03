@@ -98,7 +98,7 @@ interface IArbiterAmAmmHarbergerLease {
     /// @param strategy The address of the strategy that will be used if the bid wins from the next rent payment
     function overbid(
         PoolKey calldata key,
-        uint96 rentPerBlock,
+        uint80 rentPerBlock,
         uint48 rentEndBlock,
         address strategy
     ) external;
