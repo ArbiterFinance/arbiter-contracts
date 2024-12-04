@@ -15,6 +15,7 @@ import {TickMath} from "pancake-v4-core/src/pool-cl/libraries/TickMath.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Minimal} from "pancake-v4-core/src/interfaces/IERC20Minimal.sol";
 import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {ICLPositionManager} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
 import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
 import {ILockCallback} from "pancake-v4-core/src/interfaces/ILockCallback.sol";
 import {console} from "forge-std/console.sol";
@@ -54,13 +55,12 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
 
-    Currency rentCurrency;
+    Currency immutable rentCurrency;
 
     constructor(
         ICLPoolManager poolManager_,
         ICLPositionManager positionManager_,
         address rentCurrency_,
-        bool rentInTokenZero_,
         address initOwner_,
         uint32 transitionBlocks_,
         uint32 minRentBlocks_,
@@ -120,12 +120,14 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
         PoolId poolId = key.toId();
 
+        (, int24 tick, , ) = poolManager.getSlot0(poolId);
+
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
             .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
-            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG);
+            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
+            .setLastActiveTick(tick);
 
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
         _initialize(poolId, tick);
 
         return this.beforeInitialize.selector;
@@ -233,19 +235,19 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
-            _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
             _payRent(key);
+            _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
         }
 
         return (this.afterSwap.selector, 0);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////// Internal ////////////////////////////////////
+    //////////////////////// ArbiterAmAmmSimpleHook Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
     function _getPoolRentCurrency(
-        PoolKey memory key
+        PoolKey memory
     ) internal view override returns (Currency) {
         return rentCurrency;
     }
@@ -305,11 +307,38 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         return;
     }
 
-    function _transferRewards(
-        uint256 tokenId,
-        address to,
-        uint256 rewards
+    ///////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////// RewardTracker Overrides //////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    function _beforeOnSubscribeTracker(PoolKey memory key) internal override {
+        _payRent(key);
+    }
+
+    function _beforeOnUnubscribeTracker(PoolKey memory key) internal override {
+        _payRent(key);
+    }
+
+    function _beforeOnModifyLiquidityTracker(
+        PoolKey memory key
     ) internal override {
-        IERC20(rentCurrency).transferFrom(address(this), to, rewards);
+        _payRent(key);
+    }
+
+    function _beforeOnNotifyTransferTracker(
+        PoolKey memory key
+    ) internal override {
+        _payRent(key);
+    }
+
+    function collectRewards(address to) external returns (uint256 rewards) {
+        rewards = accruedRewards[msg.sender];
+        accruedRewards[msg.sender] = 0;
+
+        vault.lock(
+            abi.encode(
+                CallbackData(Currency.unwrap(rentCurrency), to, 0, rewards)
+            )
+        );
     }
 }
