@@ -117,7 +117,7 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
-            _payRent(key);
+            _updateAuctionStateAndPayRent(key);
             _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
         }
 
@@ -146,23 +146,23 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     ///////////////////////////////////////////////////////////////////////////////////
 
     function _beforeOnSubscribeTracker(PoolKey memory key) internal override {
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
     }
 
     function _beforeOnUnubscribeTracker(PoolKey memory key) internal override {
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
     }
 
     function _beforeOnModifyLiquidityTracker(
         PoolKey memory key
     ) internal override {
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
     }
 
     function _beforeOnNotifyTransferTracker(
         PoolKey memory key
     ) internal override {
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
     }
 
     function collectRewards(address to) external returns (uint256 rewards) {
