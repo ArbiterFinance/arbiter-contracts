@@ -28,10 +28,14 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 // TODO decide on the blockNumber storage size uint32 / uint48 / uint64
 
-uint8 constant DEFAULT_WINNER_FEE_SHARE = 6; // 6/127 ~= 4.72%
+uint24 constant MAX_POOL_SWAP_FEE = 50000; // 5%
+
+uint16 constant DEFAULT_WINNER_FEE_SHARE = 3276; // 3276/65535 ~= 4.99%
 uint8 constant DEFAULT_GET_SWAP_FEE_LOG = 13; // 2^13 = 8192
-uint24 constant DEFAULT_MAX_POOL_SWAP_FEE = 10000; // 1.0%
 uint16 constant DEFAULT_DEFAULT_POOL_SWAP_FEE = 300; // 0.03%
+uint8 constant DEFAULT_OVERBID_FACTOR = 4; // 4/127 ~= 3.15%
+uint8 constant DEFAULT_TRANSITION_BLOCKS = 20;
+uint16 constant DEFAULT_MINIMUM_RENT_BLOCKS = 300;
 
 uint24 constant DEFAULT_FEE = 400; // 0.04%
 
@@ -183,21 +187,30 @@ abstract contract ArbiterAmAmmBaseHook is
                 hookData
             )
         returns (uint24 _fee) {
-            if (_fee < 1e6) {
+            console.log("[beforeSwap] _fee: %d", _fee);
+            if (_fee < MAX_POOL_SWAP_FEE) {
                 fee = _fee;
+            } else {
+                fee = MAX_POOL_SWAP_FEE;
             }
         } catch {}
+        console.log("[beforeSwap] fee: %d", fee);
 
         int256 totalFees = (params.amountSpecified * int256(uint256(fee))) /
             1e6;
+        console.log("[beforeSwap] totalFees: %d", totalFees);
         uint256 absTotalFees = totalFees < 0
             ? uint256(-totalFees)
             : uint256(totalFees);
+        console.log("[beforeSwap] absTotalFees: %d", absTotalFees);
 
         // Calculate fee split
         uint256 strategyFee = (absTotalFees * slot0.winnerFeeSharePart()) /
             type(uint16).max;
+
+        console.log("[beforeSwap] strategyFee: %d", strategyFee);
         uint256 lpFee = absTotalFees - strategyFee;
+        console.log("[beforeSwap] lpFee: %d", lpFee);
 
         // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
@@ -491,9 +504,11 @@ abstract contract ArbiterAmAmmBaseHook is
 
         // check if we need to change strategy
         if (slot0.shouldChangeStrategy()) {
-            poolSlot0[poolId] = slot0
+            console.log("[_ensureWinnerStrategyUpdated] shouldChangeStrategy");
+            slot0 = slot0
                 .setStrategyAddress(winnerStrategies[poolId])
                 .setShouldChangeStrategy(false);
+            poolSlot0[poolId] = slot0;
         }
 
         return slot0;
@@ -506,11 +521,27 @@ abstract contract ArbiterAmAmmBaseHook is
         uint32 lastPaidBlock = slot1.lastPaidBlock();
         uint128 remainingRent = slot1.remainingRent();
 
+        console.log(
+            "[_updateAuctionStateAndPayRent] lastPaidBlock: %d",
+            lastPaidBlock
+        );
+        console.log(
+            "[_updateAuctionStateAndPayRent] remainingRent: %d",
+            remainingRent
+        );
+        console.log(
+            "[_updateAuctionStateAndPayRent] block.number: %d",
+            block.number
+        );
         if (lastPaidBlock == uint32(block.number)) {
+            console.log(
+                "[_updateAuctionStateAndPayRent] lastPaidBlock == block.number"
+            );
             return;
         }
 
         if (remainingRent == 0) {
+            console.log("[_updateAuctionStateAndPayRent] remainingRent == 0");
             slot1 = slot1.setLastPaidBlock(uint32(block.number));
             poolSlot1[poolId] = slot1;
             return;
