@@ -674,7 +674,7 @@
 //             )
 //         );
 
-//         uint256 rewards = positions[tokenId].acruedReward;
+//         uint256 rewards = positions[tokenId].accruedReward;
 //         delete positions[tokenId];
 
 //         if (rewards > 0) {

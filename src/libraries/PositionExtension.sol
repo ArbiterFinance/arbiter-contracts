@@ -19,7 +19,6 @@ library PositionExtension {
     struct State {
         // the amount of liquidity owned by this position
         uint256 rewardsPerLiquidityLastX128;
-        uint256 acruedReward;
     }
 
     /// @notice Returns the State struct of a position, given an owner and position boundaries
@@ -72,17 +71,17 @@ library PositionExtension {
         }
     }
 
-    /// @notice Credits accumulated rewards to a user's position
-    function updateRewards(
+    /// @notice Calculates accumulated rewards and updates the user's position state
+    function accumulateRewards(
         State storage self,
         uint128 liquidity,
         uint256 rewardsPerLiquidityInsideX128
-    ) internal {
+    ) internal returns (uint256 rewards) {
         unchecked {
             uint256 rewardsPerLiquididtyGrowthX128 = rewardsPerLiquidityInsideX128 -
                     self.rewardsPerLiquidityLastX128;
 
-            self.acruedReward += FullMath.mulDiv(
+            rewards = FullMath.mulDiv(
                 rewardsPerLiquididtyGrowthX128,
                 liquidity,
                 FixedPoint128.Q128
@@ -92,24 +91,10 @@ library PositionExtension {
         }
     }
 
-    function collectRewards(
-        State storage self
-    ) internal returns (uint256 rewards) {
-        rewards = self.acruedReward;
-        self.acruedReward = 0;
-    }
-
     function initialize(
         State storage self,
         uint256 rewardsPerLiquididtyInsideX128
     ) internal {
         self.rewardsPerLiquidityLastX128 = rewardsPerLiquididtyInsideX128;
-        self.acruedReward = 0;
-    }
-
-    function kill(State storage self) internal returns (uint256 rewards) {
-        rewards = self.acruedReward;
-        self.rewardsPerLiquidityLastX128 = 0;
-        self.acruedReward = 0;
     }
 }

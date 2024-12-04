@@ -32,6 +32,7 @@ abstract contract RewardTracker is IRewardTracker {
 
     mapping(PoolId => PoolExtension.State) public pools;
     mapping(uint256 => PositionExtension.State) public positions;
+    mapping(address => uint256) public accruedRewards;
     ICLPositionManager public immutable positionManager;
 
     modifier onlyPositionManager() {
@@ -65,18 +66,30 @@ abstract contract RewardTracker is IRewardTracker {
         pools[id].crossToActiveTick(newActiveTick, tickSpacing);
     }
 
+    function _accrueRewards(
+        uint256 tokenId,
+        address owner,
+        uint128 liquidity,
+        uint256 rewardsPerLiquidityCumulativeX128
+    ) internal {
+        accruedRewards[owner] += positions[tokenId].accumulateRewards(
+            liquidity,
+            rewardsPerLiquidityCumulativeX128
+        );
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////// ISubscriber Implementation //////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////
 
-    function _beforeOnSubscribeTracker(uint256 tokenId) internal virtual;
+    function _beforeOnSubscribeTracker(PoolKey memory key) internal virtual;
 
     function _onSubscribeTracker(uint256 tokenId) internal {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
 
-        _beforeOnSubscribeTracker(tokenId);
+        _beforeOnSubscribeTracker(poolKey);
         pools[poolKey.toId()].modifyLiquidity(
             PoolExtension.ModifyLiquidityParams({
                 tickLower: positionInfo.tickLower(),
@@ -102,14 +115,24 @@ abstract contract RewardTracker is IRewardTracker {
         _onSubscribeTracker(tokenId);
     }
 
-    function _beforeOnUnubscribeTracker(uint256 tokenId) internal virtual;
+    function _beforeOnUnubscribeTracker(PoolKey memory key) internal virtual;
 
     function _onUnubscribeTracker(uint256 tokenId) internal {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
 
-        _beforeOnUnubscribeTracker(tokenId);
+        _beforeOnUnubscribeTracker(poolKey);
+        _accrueRewards(
+            tokenId,
+            IERC721(address(positionManager)).ownerOf(tokenId),
+            liquidity,
+            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
+                positionInfo.tickLower(),
+                positionInfo.tickUpper()
+            )
+        );
+
         pools[poolKey.toId()].modifyLiquidity(
             PoolExtension.ModifyLiquidityParams({
                 tickLower: positionInfo.tickLower(),
@@ -119,20 +142,7 @@ abstract contract RewardTracker is IRewardTracker {
             })
         );
 
-        positions[tokenId].updateRewards(
-            liquidity,
-            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
-                positionInfo.tickLower(),
-                positionInfo.tickUpper()
-            )
-        );
-
-        uint256 rewards = positions[tokenId].acruedReward;
         delete positions[tokenId];
-
-        if (rewards > 0) {
-            _transferRewards(tokenId, to, rewards);
-        }
     }
 
     /// @inheritdoc ICLSubscriber
@@ -142,6 +152,10 @@ abstract contract RewardTracker is IRewardTracker {
         _onUnubscribeTracker(tokenId);
     }
 
+    function _beforeOnModifyLiquidityTracker(
+        PoolKey memory key
+    ) internal virtual;
+
     function _onModifyLiquidityTracker(
         uint256 tokenId,
         int256 liquidityChange
@@ -149,10 +163,22 @@ abstract contract RewardTracker is IRewardTracker {
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
 
+        _beforeOnModifyLiquidityTracker(poolKey);
+
         // take liquididty before the change
         uint128 liquidity = uint128(
             int128(positionManager.getPositionLiquidity(tokenId)) -
                 int128(liquidityChange)
+        );
+
+        _accrueRewards(
+            tokenId,
+            IERC721(address(positionManager)).ownerOf(tokenId),
+            liquidity,
+            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
+                positionInfo.tickLower(),
+                positionInfo.tickUpper()
+            )
         );
 
         pools[poolKey.toId()].modifyLiquidity(
@@ -162,14 +188,6 @@ abstract contract RewardTracker is IRewardTracker {
                 liquidityDelta: int128(liquidityChange),
                 tickSpacing: poolKey.parameters.getTickSpacing()
             })
-        );
-
-        positions[tokenId].updateRewards(
-            liquidity,
-            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
-                positionInfo.tickLower(),
-                positionInfo.tickUpper()
-            )
         );
     }
 
@@ -182,13 +200,41 @@ abstract contract RewardTracker is IRewardTracker {
         _onModifyLiquidityTracker(tokenId, liquidityChange);
     }
 
+    function _beforeOnNotifyTransferTracker(
+        PoolKey memory key
+    ) internal virtual;
+
+    function _onNotifyTransferTracker(
+        uint256 tokenId,
+        address previousOwner,
+        address
+    ) internal {
+        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
+            .getPoolAndPositionInfo(tokenId);
+
+        // take liquididty before the change
+        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
+
+        _beforeOnNotifyTransferTracker(poolKey);
+
+        _accrueRewards(
+            tokenId,
+            previousOwner,
+            liquidity,
+            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
+                positionInfo.tickLower(),
+                positionInfo.tickUpper()
+            )
+        );
+    }
+
     /// @inheritdoc ICLSubscriber
     function notifyTransfer(
         uint256 tokenId,
         address previousOwner,
         address newOwner
     ) external override {
-        // do nothing
+        _onNotifyTransferTracker(tokenId, previousOwner, newOwner);
     }
 
     function getRewardsPerLiquidityInsideX128(
@@ -208,50 +254,4 @@ abstract contract RewardTracker is IRewardTracker {
     ) external view override returns (uint256) {
         return pools[poolKey.toId()].getRewardsPerLiquidityCumulativeX128();
     }
-
-    function _isApprovedOrOwner(
-        address spender,
-        uint256 tokenId
-    ) internal view returns (bool) {
-        return
-            spender == IERC721(address(positionManager)).ownerOf(tokenId) ||
-            IERC721(address(positionManager)).getApproved(tokenId) == spender ||
-            IERC721(address(positionManager)).isApprovedForAll(
-                IERC721(address(positionManager)).ownerOf(tokenId),
-                spender
-            );
-    }
-
-    function callectRewards(
-        uint256 tokenId,
-        address to
-    ) external returns (uint256 rewards) {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
-
-        require(
-            _isApprovedOrOwner(msg.sender, tokenId),
-            "SoloTracker: not approved or owner"
-        );
-
-        // take liquididty before the change
-        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
-
-        positions[tokenId].updateRewards(
-            liquidity,
-            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
-                positionInfo.tickLower(),
-                positionInfo.tickUpper()
-            )
-        );
-        rewards = positions[tokenId].collectRewards();
-
-        _transferRewards(tokenId, to, rewards);
-    }
-
-    function _transferRewards(
-        uint256 tokenId,
-        address to,
-        uint256 rewards
-    ) internal virtual;
 }

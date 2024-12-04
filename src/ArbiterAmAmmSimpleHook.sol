@@ -110,10 +110,13 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
         PoolId poolId = key.toId();
 
+        (, int24 tick, , ) = poolManager.getSlot0(poolId);
+
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
             .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
-            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG);
+            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
+            .setLastActiveTick(tick);
 
         return this.beforeInitialize.selector;
     }
