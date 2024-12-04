@@ -130,9 +130,9 @@ abstract contract RewardTracker is IRewardTracker {
         uint256 rewards = positions[tokenId].acruedReward;
         delete positions[tokenId];
 
-        // if (rewards > 0) {
-        //     positionManager.transferRewards(tokenId, rewards);
-        // }
+        if (rewards > 0) {
+            _transferRewards(tokenId, to, rewards);
+        }
     }
 
     /// @inheritdoc ICLSubscriber
@@ -246,6 +246,12 @@ abstract contract RewardTracker is IRewardTracker {
         );
         rewards = positions[tokenId].collectRewards();
 
-        /// transfer rewards to to.
+        _transferRewards(tokenId, to, rewards);
     }
+
+    function _transferRewards(
+        uint256 tokenId,
+        address to,
+        uint256 rewards
+    ) internal virtual;
 }
