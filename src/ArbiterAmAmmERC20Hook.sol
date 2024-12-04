@@ -82,34 +82,6 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     ////////////////////////////////////// HOOK ///////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Specify hook permissions. `beforeSwapReturnDelta` is also set to charge custom swap fees that go to the strategist instead of LPs.
-    function getHooksRegistrationBitmap()
-        external
-        pure
-        override
-        returns (uint16)
-    {
-        return
-            _hooksRegistrationBitmapFrom(
-                Permissions({
-                    beforeInitialize: true,
-                    afterInitialize: false,
-                    beforeAddLiquidity: true,
-                    beforeRemoveLiquidity: false,
-                    afterAddLiquidity: false,
-                    afterRemoveLiquidity: false,
-                    beforeSwap: true,
-                    afterSwap: false,
-                    beforeDonate: false,
-                    afterDonate: false,
-                    beforeSwapReturnsDelta: true,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
-                })
-            );
-    }
-
     /// @dev Reverts if dynamic fee flag is not set or if the pool is not initialized with dynamic fees.
     function beforeInitialize(
         address,
@@ -133,96 +105,6 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         return this.beforeInitialize.selector;
     }
 
-    /// @notice Distributes rent to LPs before each liquidity change.
-    function beforeAddLiquidity(
-        address,
-        PoolKey calldata key,
-        ICLPoolManager.ModifyLiquidityParams calldata,
-        bytes calldata
-    ) external override poolManagerOnly returns (bytes4) {
-        _payRent(key);
-        return this.beforeAddLiquidity.selector;
-    }
-
-    /// @notice Distributes rent to LPs before each swap.
-    /// @notice Returns fee that will be paid to the hook and pays the fee to the strategist.
-    function beforeSwap(
-        address sender,
-        PoolKey calldata key,
-        ICLPoolManager.SwapParams calldata params,
-        bytes calldata hookData
-    )
-        external
-        override
-        poolManagerOnly
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
-        PoolId poolId = key.toId();
-        AuctionSlot0 slot0 = poolSlot0[poolId];
-        address strategy = slot0.strategyAddress();
-        uint24 fee = DEFAULT_FEE;
-        // If no strategy is set, the swap fee is just set to the default value
-
-        if (strategy == address(0)) {
-            return (
-                this.beforeSwap.selector,
-                toBeforeSwapDelta(0, 0),
-                fee | LPFeeLibrary.OVERRIDE_FEE_FLAG
-            );
-        }
-
-        // Call strategy contract to get swap fee.
-        try
-            IArbiterFeeProvider(strategy).getSwapFee(
-                sender,
-                key,
-                params,
-                hookData
-            )
-        returns (uint24 _fee) {
-            if (_fee < 1e6) {
-                fee = _fee;
-            }
-        } catch {}
-
-        int256 totalFees = (params.amountSpecified * int256(uint256(fee))) /
-            1e6;
-        uint256 absTotalFees = totalFees < 0
-            ? uint256(-totalFees)
-            : uint256(totalFees);
-
-        // Calculate fee split
-        uint256 strategyFee = (absTotalFees * slot0.winnerFeeSharePart()) /
-            type(uint16).max;
-        uint256 lpFee = absTotalFees - strategyFee;
-
-        // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
-        // If amountSpecified > 0, the swap is exact-out and it's the bought token.
-        bool exactOut = params.amountSpecified > 0;
-
-        Currency feeCurrency = exactOut == params.zeroForOne
-            ? key.currency0
-            : key.currency1;
-
-        // Send fees to strategy
-        vault.mint(strategy, feeCurrency, strategyFee);
-        if (exactOut) {
-            poolManager.donate(key, lpFee, 0, "");
-        } else {
-            poolManager.donate(key, 0, lpFee, "");
-        }
-
-        // Override LP fee to zero
-
-        return (
-            this.beforeSwap.selector,
-            exactOut
-                ? toBeforeSwapDelta(0, int128(totalFees))
-                : toBeforeSwapDelta(0, -int128(totalFees)),
-            LPFeeLibrary.OVERRIDE_FEE_FLAG
-        );
-    }
-
     function afterSwap(
         address,
         PoolKey calldata key,
@@ -243,7 +125,7 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
-    //////////////////////// ArbiterAmAmmSimpleHook Overrides /////////////////////////
+    //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
     function _getPoolRentCurrency(
@@ -252,59 +134,11 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         return rentCurrency;
     }
 
-    function _payRent(PoolKey memory key) internal override {
-        PoolId poolId = key.toId();
-        AuctionSlot0 slot0 = poolSlot0[poolId];
-        AuctionSlot1 slot1 = poolSlot1[poolId];
-
-        uint32 lastPaidBlock = slot1.lastPaidBlock();
-        uint128 remainingRent = slot1.remainingRent();
-
-        if (lastPaidBlock == uint32(block.number)) {
-            return;
-        }
-
-        if (remainingRent == 0) {
-            slot1 = slot1.setLastPaidBlock(uint32(block.number));
-            poolSlot1[poolId] = slot1;
-            return;
-        }
-
-        // check if we need to change strategy
-        if (slot0.shouldChangeStrategy()) {
-            slot0 = slot0
-                .setStrategyAddress(winnerStrategies[poolId])
-                .setShouldChangeStrategy(false);
-        }
-
-        uint32 blocksElapsed;
-        unchecked {
-            blocksElapsed = uint32(block.number) - lastPaidBlock;
-        }
-
-        uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
-
-        if (rentAmount > remainingRent) {
-            rentAmount = remainingRent;
-            winners[poolId] = address(0);
-            winnerStrategies[poolId] = address(0);
-            slot0 = slot0.setShouldChangeStrategy(true);
-            slot1 = slot1.setRentPerBlock(0);
-        }
-
-        slot1 = slot1.setLastPaidBlock(uint32(block.number));
-
-        unchecked {
-            slot1 = slot1.setRemainingRent(remainingRent - rentAmount);
-        }
-
-        // pay the rent
-        _distributeReward(poolId, rentAmount);
-
-        poolSlot1[poolId] = slot1;
-        poolSlot0[poolId] = slot0;
-
-        return;
+    function _distributeRent(
+        PoolKey memory key,
+        uint128 rentAmount
+    ) internal override {
+        _distributeReward(key.toId(), rentAmount);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
