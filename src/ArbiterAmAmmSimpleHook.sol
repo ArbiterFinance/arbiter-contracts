@@ -27,18 +27,7 @@ import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
-
-// TODO decide on the blockNumber storage size uint32 / uint48 / uint64
-
-uint8 constant DEFAULT_WINNER_FEE_SHARE = 6; // 6/127 ~= 4.72%
-uint8 constant DEFAULT_GET_SWAP_FEE_LOG = 13; // 2^13 = 8192
-uint24 constant DEFAULT_MAX_POOL_SWAP_FEE = 10000; // 1.0%
-uint16 constant DEFAULT_DEFAULT_POOL_SWAP_FEE = 300; // 0.03%
-uint8 constant DEFAULT_OVERBID_FACTOR = 4; // 4/127 ~= 3.15%
-uint8 constant DEFAULT_TRANSITION_BLOCKS = 20;
-uint16 constant DEFAULT_MINIMUM_RENT_BLOCKS = 300;
-
-uint24 constant DEFAULT_FEE = 400; // 0.04%
+import {DEFAULT_GET_SWAP_FEE_LOG, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "./ArbiterAmAmmBaseHook.sol";
 
 /// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.

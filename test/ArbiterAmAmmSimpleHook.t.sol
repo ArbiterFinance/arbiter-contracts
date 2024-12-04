@@ -19,7 +19,8 @@ import {MockCLSwapRouter} from "./pool-cl/helpers/MockCLSwapRouter.sol";
 import {MockCLPositionManager} from "./pool-cl/helpers/MockCLPositionManager.sol";
 import {IArbiterFeeProvider} from "../src/interfaces/IArbiterFeeProvider.sol";
 import {IArbiterAmAmmHarbergerLease} from "../src/interfaces/IArbiterAmAmmHarbergerLease.sol";
-import {ArbiterAmAmmSimpleHook, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MAX_POOL_SWAP_FEE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "../src/ArbiterAmAmmSimpleHook.sol";
+import {ArbiterAmAmmSimpleHook} from "../src/ArbiterAmAmmSimpleHook.sol";
+import {DEFAULT_WINNER_FEE_SHARE, MAX_POOL_SWAP_FEE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "../src/ArbiterAmAmmBaseHook.sol";
 import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
 import {ICLRouterBase} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
 import {DeployPermit2} from "permit2/test/utils/DeployPermit2.sol";
@@ -186,8 +187,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
     }
 
     function testStrategyContractSetsFee() public {
-        // Deploy a mock strategy that sets swap fee to DEFAULT_MAX_POOL_SWAP_FEE
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        // Deploy a mock strategy that sets swap fee to MAX_POOL_SWAP_FEE
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
         transferToUser1AndDepositAs(10_000e18);
@@ -220,9 +221,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 feeAmount = (amountIn * DEFAULT_MAX_POOL_SWAP_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * MAX_POOL_SWAP_FEE) / 1e6;
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
-            127;
+            type(uint16).max;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -249,8 +250,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
     }
 
     function testStrategyFeeCappedAtMaxFee() public {
-        // Deploy a mock strategy that sets swap fee to a value greater than DEFAULT_MAX_POOL_SWAP_FEE
-        uint24 strategyFee = DEFAULT_MAX_POOL_SWAP_FEE + 1000; // Fee greater than DEFAULT_MAX_POOL_SWAP_FEE
+        // Deploy a mock strategy that sets swap fee to a value greater than MAX_POOL_SWAP_FEE
+        uint24 strategyFee = MAX_POOL_SWAP_FEE + 1000; // Fee greater than MAX_POOL_SWAP_FEE
         MockStrategy strategy = new MockStrategy(strategyFee);
 
         transferToUser1AndDepositAs(10_000e18);
@@ -285,9 +286,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 feeAmount = (amountIn * DEFAULT_MAX_POOL_SWAP_FEE) / 1e6;
+        uint256 feeAmount = (amountIn * MAX_POOL_SWAP_FEE) / 1e6;
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
-            127;
+            type(uint16).max;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -482,7 +483,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         // Calculate the expected fee using DEFAULT_SWAP_FEE
         uint256 feeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
-            127;
+            type(uint16).max;
 
         assertEq(prevBalance0 - postBalance0, amountIn, "Amount in mismatch");
 
@@ -498,8 +499,8 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
     }
 
     function testDefaultFeeAfterAuctionWinExpired() public {
-        // Deploy a mock strategy that sets swap fee to DEFAULT_MAX_POOL_SWAP_FEE
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        // Deploy a mock strategy that sets swap fee to MAX_POOL_SWAP_FEE
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
         transferToUser1AndDepositAs(10_000e18);
@@ -583,7 +584,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         uint256 feeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6;
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
-            127;
+            type(uint16).max;
 
         console.log("prevBalance0: ", prevBalance0);
         console.log("postBalance0: ", postBalance0);
@@ -646,7 +647,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             "Initial active strategy should be address(0)"
         );
 
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
         transferToUser1AndDepositAs(10_000e18);
         vm.startPrank(user1);
 
@@ -669,7 +670,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testActiveStrategy() public {
+    function testActiveStrategyDifferentBlock() public {
         address initialStrategy = arbiterHook.activeStrategy(key);
         assertEq(
             initialStrategy,
@@ -677,7 +678,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             "Initial active strategy should be address(0)"
         );
 
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
         transferToUser1AndDepositAs(10_000e18);
         vm.startPrank(user1);
 
@@ -710,7 +711,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             "Initial winner strategy should be address(0)"
         );
 
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
 
         transferToUser1AndDepositAs(10_000e18);
 
@@ -739,7 +740,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             "Initial winner should be address(0)"
         );
 
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
 
         transferToUser1AndDepositAs(10_000e18);
 
@@ -762,7 +763,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint96 initialRentPerBlock = slot1.rentPerBlock();
         assertEq(initialRentPerBlock, 0, "Initial rentPerBlock should be zero");
 
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
         transferToUser1AndDepositAs(10_000e18);
         vm.startPrank(user1);
 
@@ -816,7 +817,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
         console.log("current block", block.number);
         console.log("desiredRentEndBlock", desiredRentEndBlock);
-        MockStrategy strategy = new MockStrategy(DEFAULT_MAX_POOL_SWAP_FEE);
+        MockStrategy strategy = new MockStrategy(MAX_POOL_SWAP_FEE);
 
         transferToUser1AndDepositAs(10_000e18);
 
@@ -967,7 +968,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         uint256 feeAmount = (amountIn * updatedFee) / 1e6;
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
-            127;
+            type(uint16).max;
 
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
