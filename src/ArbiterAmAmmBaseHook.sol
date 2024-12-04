@@ -143,7 +143,7 @@ abstract contract ArbiterAmAmmBaseHook is
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual override poolManagerOnly returns (bytes4) {
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
         return this.beforeAddLiquidity.selector;
     }
 
@@ -161,8 +161,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolManagerOnly
         returns (bytes4, BeforeSwapDelta, uint24)
     {
-        PoolId poolId = key.toId();
-        AuctionSlot0 slot0 = poolSlot0[poolId];
+        AuctionSlot0 slot0 = _ensureWinnerStrategyUpdated(key);
         address strategy = slot0.strategyAddress();
         uint24 fee = DEFAULT_FEE;
         // If no strategy is set, the swap fee is just set to the default value
@@ -239,7 +238,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
-            _payRent(key);
+            _updateAuctionStateAndPayRent(key);
         }
 
         return (this.afterSwap.selector, 0);
@@ -378,7 +377,7 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        _payRent(key);
+        _updateAuctionStateAndPayRent(key);
 
         Currency currency = _getPoolRentCurrency(key);
 
@@ -484,9 +483,24 @@ abstract contract ArbiterAmAmmBaseHook is
     ///////////////////////////////////// Internal ////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    function _payRent(PoolKey memory key) internal {
+    function _ensureWinnerStrategyUpdated(
+        PoolKey memory key
+    ) internal returns (AuctionSlot0) {
         PoolId poolId = key.toId();
         AuctionSlot0 slot0 = poolSlot0[poolId];
+
+        // check if we need to change strategy
+        if (slot0.shouldChangeStrategy()) {
+            poolSlot0[poolId] = slot0
+                .setStrategyAddress(winnerStrategies[poolId])
+                .setShouldChangeStrategy(false);
+        }
+
+        return slot0;
+    }
+
+    function _updateAuctionStateAndPayRent(PoolKey memory key) internal {
+        PoolId poolId = key.toId();
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
         uint32 lastPaidBlock = slot1.lastPaidBlock();
@@ -501,13 +515,7 @@ abstract contract ArbiterAmAmmBaseHook is
             poolSlot1[poolId] = slot1;
             return;
         }
-
-        // check if we need to change strategy
-        if (slot0.shouldChangeStrategy()) {
-            slot0 = slot0
-                .setStrategyAddress(winnerStrategies[poolId])
-                .setShouldChangeStrategy(false);
-        }
+        AuctionSlot0 slot0 = _ensureWinnerStrategyUpdated(key);
 
         uint32 blocksElapsed;
         unchecked {
@@ -517,6 +525,7 @@ abstract contract ArbiterAmAmmBaseHook is
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
         if (rentAmount > remainingRent) {
+            // pay the remainingRent and reset the auction - no winner
             rentAmount = remainingRent;
             winners[poolId] = address(0);
             winnerStrategies[poolId] = address(0);
