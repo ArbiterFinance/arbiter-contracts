@@ -461,7 +461,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         poolSlot0[poolId] = slot0.setShouldChangeStrategy(true);
         poolSlot1[poolId] = slot1
-            .setRemainingRent(requiredDeposit)
+            .setRemainingRent(totalRent)
             .setLastPaidBlock(uint32(block.number))
             .setRentPerBlock(rentPerBlock);
 
