@@ -74,7 +74,7 @@ library PositionExtension {
     /// @notice Calculates accumulated rewards and updates the user's position state
     function accumulateRewards(
         State storage self,
-        uint128 liquidity,
+        uint128 positionLiquidity,
         uint256 rewardsPerLiquidityInsideX128
     ) internal returns (uint256 rewards) {
         unchecked {
@@ -83,7 +83,7 @@ library PositionExtension {
 
             rewards = FullMath.mulDiv(
                 rewardsPerLiquididtyGrowthX128,
-                liquidity,
+                positionLiquidity,
                 FixedPoint128.Q128
             );
 

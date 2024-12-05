@@ -129,12 +129,12 @@ library AuctionSlot0Library {
         assembly ("memory-safe") {
             _result := or(
                 and(
-                    not(shl(SHOULD_CHANGE_STRATEGY_OFFSET, MASK_1_BITS)),
+                    not(shl(SHOULD_CHANGE_STRATEGY_OFFSET, MASK_1_BIT)),
                     _packed
                 ),
                 shl(
                     SHOULD_CHANGE_STRATEGY_OFFSET,
-                    and(MASK_1_BITS, _shouldChangeStrategy)
+                    and(MASK_1_BIT, _shouldChangeStrategy)
                 )
             )
         }

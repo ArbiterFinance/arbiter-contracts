@@ -210,6 +210,14 @@ library PoolExtension {
         // update the active liquidity
         if (params.tickLower < self.tick && self.tick < params.tickUpper) {
             console.log("[PoolExtension][modifyLiquidity] Updating liquidty");
+            console.log(
+                "[PoolExtension][modifyLiquidity] self.liquidity",
+                self.liquidity
+            );
+            console.log(
+                "[PoolExtension][modifyLiquidity] liquidityDelta",
+                liquidityDelta
+            );
             self.liquidity = LiquidityMath.addDelta(
                 self.liquidity,
                 liquidityDelta
@@ -264,16 +272,16 @@ library PoolExtension {
                 currentTick,
                 self.rewardsPerLiquidityCumulativeX128
             );
-            console.log(
-                "[PoolExtension][crossToActiveTick] liquidityNet",
-                liquidityNet
-            );
 
             // if we're moving leftward, we interpret liquidityNet as the opposite sign
             // safe because liquidityNet cannot be type(int128).min
             unchecked {
                 if (goingLeft) liquidityNet = -liquidityNet;
             }
+            console.log(
+                "[PoolExtension][crossToActiveTick] liquidityNet",
+                liquidityNet
+            );
 
             console.log(
                 "[PoolExtension][crossToActiveTick] nextTick",
@@ -287,13 +295,17 @@ library PoolExtension {
                 currentTick = goingLeft ? nextTick - 1 : nextTick;
             }
             liquidityChange += liquidityNet;
-            console.log(
-                "[PoolExtension][crossToActiveTick] liquidityChange",
-                liquidityChange
-            );
         }
 
         self.tick = activeTick;
+        console.log(
+            "[PoolExtension][crossToActiveTick] self.liquidity",
+            self.liquidity
+        );
+        console.log(
+            "[PoolExtension][crossToActiveTick] liquidityChange",
+            liquidityChange
+        );
         self.liquidity = LiquidityMath.addDelta(
             self.liquidity,
             liquidityChange
