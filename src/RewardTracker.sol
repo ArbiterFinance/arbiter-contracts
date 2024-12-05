@@ -14,8 +14,8 @@ import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
 import {ICLSubscriber} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLSubscriber.sol";
 
-import {PoolExtension} from "./libraries/PoolExtension.sol";
 import {IRewardTracker} from "./interfaces/IRewardTracker.sol";
+import {PoolExtension} from "./libraries/PoolExtension.sol";
 import {PositionExtension} from "./libraries/PositionExtension.sol";
 import {CLPool} from "pancake-v4-core/src/pool-cl/libraries/CLPool.sol";
 import {CLPoolGetters} from "pancake-v4-core/src/pool-cl/libraries/CLPoolGetters.sol";
@@ -49,6 +49,8 @@ abstract contract RewardTracker is IRewardTracker {
 
     // @dev this should be called before any rewards are distributed
     function _initialize(PoolId id, int24 tick) internal {
+        console.log("[RewardTracker._initialize]");
+        console.log("[RewardTracker._initialize] tick:", tick);
         pools[id].initialize(tick);
     }
 
@@ -63,17 +65,18 @@ abstract contract RewardTracker is IRewardTracker {
         int24 newActiveTick,
         int24 tickSpacing
     ) internal {
-        pools[id].crossToActiveTick(newActiveTick, tickSpacing);
+        console.log("[RewardTracker._changeActiveTick]");
+        pools[id].crossToActiveTick(tickSpacing, newActiveTick);
     }
 
     function _accrueRewards(
         uint256 tokenId,
         address owner,
-        uint128 liquidity,
+        uint128 positionLiquidity,
         uint256 rewardsPerLiquidityCumulativeX128
     ) internal {
         accruedRewards[owner] += positions[tokenId].accumulateRewards(
-            liquidity,
+            positionLiquidity,
             rewardsPerLiquidityCumulativeX128
         );
     }
@@ -85,6 +88,7 @@ abstract contract RewardTracker is IRewardTracker {
     function _beforeOnSubscribeTracker(PoolKey memory key) internal virtual;
 
     function _onSubscribeTracker(uint256 tokenId) internal {
+        console.log("[RewardTracker._onSubscribeTracker]");
         (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
             .getPoolAndPositionInfo(tokenId);
         uint128 liquidity = positionManager.getPositionLiquidity(tokenId);

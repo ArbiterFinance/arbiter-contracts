@@ -28,8 +28,6 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 // TODO decide on the blockNumber storage size uint32 / uint48 / uint64
 
-uint24 constant MAX_POOL_SWAP_FEE = 50000; // 5%
-
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
 /// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
