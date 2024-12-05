@@ -30,15 +30,6 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 uint24 constant MAX_POOL_SWAP_FEE = 50000; // 5%
 
-uint16 constant DEFAULT_WINNER_FEE_SHARE = 3276; // 3276/65535 ~= 4.99%
-uint8 constant DEFAULT_GET_SWAP_FEE_LOG = 13; // 2^13 = 8192
-uint16 constant DEFAULT_DEFAULT_POOL_SWAP_FEE = 300; // 0.03%
-uint8 constant DEFAULT_OVERBID_FACTOR = 4; // 4/127 ~= 3.15%
-uint8 constant DEFAULT_TRANSITION_BLOCKS = 20;
-uint16 constant DEFAULT_MINIMUM_RENT_BLOCKS = 300;
-
-uint24 constant DEFAULT_FEE = 400; // 0.04%
-
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
 /// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
@@ -64,10 +55,13 @@ abstract contract ArbiterAmAmmBaseHook is
         uint256 withdrawAmount;
     }
 
-    uint32 internal _transitionBlocks;
-    uint32 internal _minRentBlocks;
-    uint32 internal _overbidFactor;
-    uint32 internal _auctionFee;
+    uint32 internal _transitionBlocks = 30;
+    uint32 internal _minRentBlocks = 300;
+    uint24 internal _overbidFactor = 2e4; // 2%
+    uint24 internal _defaultAuctionFee = 0;
+    uint24 internal _defaultWinnerFeeShare = 5e4;
+    uint8 internal _defaultStrategyGasLimit = 13;
+    uint16 internal _defaultSwapFee = 4e2; // 0.04%
 
     mapping(PoolId => AuctionSlot0) public poolSlot0;
     mapping(PoolId => AuctionSlot1) public poolSlot1;
@@ -84,18 +78,8 @@ abstract contract ArbiterAmAmmBaseHook is
 
     constructor(
         ICLPoolManager _poolManager,
-        address _initOwner,
-        uint32 transitionBlocks_,
-        uint32 minRentBlocks_,
-        uint32 overbidFactor_,
-        uint32 auctionFee_
-    ) CLBaseHook(_poolManager) Ownable(_initOwner) {
-        _transitionBlocks = transitionBlocks_;
-        _minRentBlocks = minRentBlocks_;
-        _overbidFactor = overbidFactor_;
-        _auctionFee = auctionFee_;
-        require(_auctionFee <= 1e5, "Invalid auction fee");
-    }
+        address _initOwner
+    ) CLBaseHook(_poolManager) Ownable(_initOwner) {}
 
     ///////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////// HOOK ///////////////////////////////////////
@@ -144,10 +128,10 @@ abstract contract ArbiterAmAmmBaseHook is
 
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
-            .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
-            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
-            .setDefaultSwapFee(DEFAULT_DEFAULT_POOL_SWAP_FEE)
-            .setMaximumSwapFee(MAX_POOL_SWAP_FEE)
+            .setWinnerFeeSharePart(_defaultWinnerFeeShare)
+            .setStrategyGasLimit(_defaultStrategyGasLimit)
+            .setDefaultSwapFee(_defaultSwapFee)
+            .setAuctionFee(_defaultAuctionFee)
             .setLastActiveTick(tick);
 
         return this.beforeInitialize.selector;
@@ -202,12 +186,9 @@ abstract contract ArbiterAmAmmBaseHook is
                 gas: 2 << slot0.strategyGasLimit()
             }(sender, key, params, hookData)
         returns (uint24 _fee) {
-            uint24 maxFee = slot0.maximumSwapFee();
             console.log("[beforeSwap] _fee: %d", _fee);
-            if (_fee < maxFee) {
+            if (_fee <= 1e6) {
                 fee = _fee;
-            } else {
-                fee = maxFee;
             }
         } catch {}
         console.log("[beforeSwap] fee: %d", fee);
@@ -221,8 +202,7 @@ abstract contract ArbiterAmAmmBaseHook is
         console.log("[beforeSwap] absTotalFees: %d", absTotalFees);
 
         // Calculate fee split
-        uint256 strategyFee = (absTotalFees * slot0.winnerFeeSharePart()) /
-            type(uint16).max;
+        uint256 strategyFee = (absTotalFees * slot0.winnerFeeSharePart()) / 1e6;
 
         console.log("[beforeSwap] strategyFee: %d", strategyFee);
         uint256 lpFee = absTotalFees - strategyFee;
@@ -320,7 +300,7 @@ abstract contract ArbiterAmAmmBaseHook is
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function winnerFeeShare(
         PoolKey calldata key
-    ) external view returns (uint16) {
+    ) external view returns (uint24) {
         return poolSlot0[key.toId()].winnerFeeSharePart();
     }
 
@@ -415,7 +395,7 @@ abstract contract ArbiterAmAmmBaseHook is
             ) {
                 uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
                     (uint120(slot1.rentPerBlock()) * _overbidFactor) /
-                    type(uint16).max;
+                    1e6;
                 if (uint120(rentPerBlock) <= minimumRentPerBlock) {
                     revert RentTooLow();
                 }
@@ -446,7 +426,7 @@ abstract contract ArbiterAmAmmBaseHook is
         // charge the new winner
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
         uint128 totalRent = rentPerBlock * rentBlockLength;
-        uint128 auctionFee = (totalRent * _auctionFee) / 1e6;
+        uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
@@ -663,23 +643,13 @@ abstract contract ArbiterAmAmmBaseHook is
         _minRentBlocks = minRentBlocks_;
     }
 
-    function setOverbidFactor(uint32 overbidFactor_) external onlyOwner {
+    function setOverbidFactor(uint24 overbidFactor_) external onlyOwner {
         _overbidFactor = overbidFactor_;
     }
 
-    function setAuctionFee(uint32 auctionFee_) external onlyOwner {
-        require(auctionFee_ <= 1e5, "Invalid auction fee");
-        _auctionFee = auctionFee_;
-    }
-
-    //      * - [192..208): `winner fee part` (16 bits) - The portion of the fee paid to the auction winner, expressed in basis points.
-    //  * - [208..216): `strategy gas limit` (8 bits) - The maximum gas allocation for executing the strategy.
-    //  * - [216..232): `default swap fee` (16 bits) - The default fee applied to swaps in basis points.
-    //  * - [232..256): `maximum swap fee` (24 bits) - The maximum allowable fee for swaps in basis points.
-
     function setWinnerFeeSharePart(
         PoolKey calldata key,
-        uint16 winnerFeeSharePart
+        uint24 winnerFeeSharePart
     ) external onlyOwner {
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setWinnerFeeSharePart(
             winnerFeeSharePart
@@ -704,12 +674,10 @@ abstract contract ArbiterAmAmmBaseHook is
         );
     }
 
-    function setMaximumSwapFee(
+    function setAuctionFee(
         PoolKey calldata key,
-        uint24 maximumSwapFee
+        uint24 auctionFee
     ) external onlyOwner {
-        poolSlot0[key.toId()] = poolSlot0[key.toId()].setMaximumSwapFee(
-            maximumSwapFee
-        );
+        poolSlot0[key.toId()] = poolSlot0[key.toId()].setAuctionFee(auctionFee);
     }
 }

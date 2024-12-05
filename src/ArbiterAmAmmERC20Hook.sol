@@ -32,7 +32,6 @@ import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPo
 
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 import {RewardTracker} from "./RewardTracker.sol";
-import {DEFAULT_GET_SWAP_FEE_LOG, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "./ArbiterAmAmmBaseHook.sol";
 
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
@@ -54,20 +53,9 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         ICLPoolManager poolManager_,
         ICLPositionManager positionManager_,
         address rentCurrency_,
-        address initOwner_,
-        uint32 transitionBlocks_,
-        uint32 minRentBlocks_,
-        uint32 overbidFactor_,
-        uint32 auctionFee_
+        address initOwner_
     )
-        ArbiterAmAmmBaseHook(
-            poolManager_,
-            initOwner_,
-            transitionBlocks_,
-            minRentBlocks_,
-            overbidFactor_,
-            auctionFee_
-        )
+        ArbiterAmAmmBaseHook(poolManager_, initOwner_)
         RewardTracker(positionManager_)
     {
         rentCurrency = Currency.wrap(rentCurrency_);
@@ -91,8 +79,10 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
-            .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
-            .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
+            .setWinnerFeeSharePart(_defaultWinnerFeeShare)
+            .setStrategyGasLimit(_defaultStrategyGasLimit)
+            .setDefaultSwapFee(_defaultSwapFee)
+            .setAuctionFee(_defaultAuctionFee)
             .setLastActiveTick(tick);
 
         _initialize(poolId, tick);

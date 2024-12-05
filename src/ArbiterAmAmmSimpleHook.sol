@@ -27,7 +27,6 @@ import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
-import {DEFAULT_GET_SWAP_FEE_LOG, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "./ArbiterAmAmmBaseHook.sol";
 
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
@@ -44,21 +43,8 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
     constructor(
         ICLPoolManager poolManager_,
         bool rentInTokenZero_,
-        address initOwner_,
-        uint32 transitionBlocks_,
-        uint32 minRentBlocks_,
-        uint32 overbidFactor_,
-        uint32 auctionFee_
-    )
-        ArbiterAmAmmBaseHook(
-            poolManager_,
-            initOwner_,
-            transitionBlocks_,
-            minRentBlocks_,
-            overbidFactor_,
-            auctionFee_
-        )
-    {
+        address initOwner_
+    ) ArbiterAmAmmBaseHook(poolManager_, initOwner_) {
         RENT_IN_TOKEN_ZERO = rentInTokenZero_;
     }
 
