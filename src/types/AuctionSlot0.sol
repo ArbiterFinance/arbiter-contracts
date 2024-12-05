@@ -23,6 +23,7 @@ using AuctionSlot0Library for AuctionSlot0 global;
 library AuctionSlot0Library {
     uint160 internal constant MASK_160_BITS =
         0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+    uint8 internal constant MASK_1_BIT = 0x01;
     uint8 internal constant MASK_8_BITS = 0xFF;
     uint16 internal constant MASK_16_BITS = 0xFFFF;
     uint24 internal constant MASK_24_BITS = 0xFFFFFF;
@@ -61,7 +62,7 @@ library AuctionSlot0Library {
     ) internal pure returns (bool _shouldChangeStrategy) {
         assembly ("memory-safe") {
             _shouldChangeStrategy := and(
-                MASK_8_BITS,
+                MASK_1_BIT,
                 shr(SHOULD_CHANGE_STRATEGY_OFFSET, _packed)
             )
         }
@@ -128,12 +129,12 @@ library AuctionSlot0Library {
         assembly ("memory-safe") {
             _result := or(
                 and(
-                    not(shl(SHOULD_CHANGE_STRATEGY_OFFSET, MASK_8_BITS)),
+                    not(shl(SHOULD_CHANGE_STRATEGY_OFFSET, MASK_1_BITS)),
                     _packed
                 ),
                 shl(
                     SHOULD_CHANGE_STRATEGY_OFFSET,
-                    and(MASK_8_BITS, _shouldChangeStrategy)
+                    and(MASK_1_BITS, _shouldChangeStrategy)
                 )
             )
         }
