@@ -160,4 +160,9 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
             )
         );
     }
+
+    function donateRewards(PoolKey calldata key, uint128 rewards) external {
+        deposits[msg.sender][rentCurrency] -= rewards;
+        _distributeReward(key.toId(), rewards);
+    }
 }

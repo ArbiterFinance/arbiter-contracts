@@ -530,7 +530,7 @@ abstract contract ArbiterAmAmmBaseHook is
     function _changeStrategyIfNeeded(
         AuctionSlot0 slot0,
         PoolId poolId
-    ) internal returns (AuctionSlot0) {
+    ) internal view returns (AuctionSlot0) {
         // check if we need to change strategy
         if (slot0.shouldChangeStrategy()) {
             console.log("[_changeStrategyIfNeeded] shouldChangeStrategy");
