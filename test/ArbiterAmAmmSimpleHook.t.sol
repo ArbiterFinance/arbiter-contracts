@@ -20,7 +20,6 @@ import {MockCLPositionManager} from "./pool-cl/helpers/MockCLPositionManager.sol
 import {IArbiterFeeProvider} from "../src/interfaces/IArbiterFeeProvider.sol";
 import {IArbiterAmAmmHarbergerLease} from "../src/interfaces/IArbiterAmAmmHarbergerLease.sol";
 import {ArbiterAmAmmSimpleHook} from "../src/ArbiterAmAmmSimpleHook.sol";
-import {DEFAULT_WINNER_FEE_SHARE, MAX_POOL_SWAP_FEE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "../src/ArbiterAmAmmBaseHook.sol";
 import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
 import {ICLRouterBase} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
 import {DeployPermit2} from "permit2/test/utils/DeployPermit2.sol";

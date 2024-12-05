@@ -37,7 +37,7 @@ interface IArbiterAmAmmHarbergerLease {
     /// @return The percentage of the swap fee that will be paid to the winner
     function winnerFeeShare(
         PoolKey calldata key
-    ) external view returns (uint16);
+    ) external view returns (uint24);
 
     /// @return The deposit of the account for the asset
     /// @param asset The address of the ERC20 to check
