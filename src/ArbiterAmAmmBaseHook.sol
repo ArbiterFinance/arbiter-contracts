@@ -39,10 +39,10 @@ uint16 constant DEFAULT_MINIMUM_RENT_BLOCKS = 300;
 
 uint24 constant DEFAULT_FEE = 400; // 0.04%
 
-/// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalities.
+/// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
-/// @dev The winner address should implement IArbiterFeeProvider to set the trading fees.
-/// @dev The winner address should be able to manage ERC6909 claim tokens in the PoolManager.
+/// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
+/// @dev The strategy address should be able to manage ERC6909 claim tokens in the PoolManager.
 abstract contract ArbiterAmAmmBaseHook is
     CLBaseHook,
     IArbiterAmAmmHarbergerLease,
@@ -147,7 +147,7 @@ abstract contract ArbiterAmAmmBaseHook is
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual override poolManagerOnly returns (bytes4) {
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
         return this.beforeAddLiquidity.selector;
     }
 
@@ -167,7 +167,10 @@ abstract contract ArbiterAmAmmBaseHook is
     {
         console.log("[beforeSwap] start");
         console.log("[beforeSwap] block.number: %d", block.number);
-        AuctionSlot0 slot0 = _ensureWinnerStrategyUpdated(key);
+        PoolId poolId = key.toId();
+        AuctionSlot0 slot0 = poolSlot0[poolId];
+        slot0 = _changeStrategyIfNeeded(slot0, poolId);
+        poolSlot0[poolId] = slot0;
         address strategy = slot0.strategyAddress();
         uint24 fee = DEFAULT_FEE;
         // If no strategy is set, the swap fee is just set to the default value
@@ -269,7 +272,7 @@ abstract contract ArbiterAmAmmBaseHook is
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
             console.log("[afterSwap] tick != slot0.lastActiveTick()");
-            _updateAuctionStateAndPayRent(key);
+            _payRentAndChangeStrategyIfNeeded(key);
         }
 
         return (this.afterSwap.selector, 0);
@@ -408,7 +411,7 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
 
         Currency currency = _getPoolRentCurrency(key);
 
@@ -514,25 +517,22 @@ abstract contract ArbiterAmAmmBaseHook is
     ///////////////////////////////////// Internal ////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    function _ensureWinnerStrategyUpdated(
-        PoolKey memory key
+    function _changeStrategyIfNeeded(
+        AuctionSlot0 slot0,
+        PoolId poolId
     ) internal returns (AuctionSlot0) {
-        PoolId poolId = key.toId();
-        AuctionSlot0 slot0 = poolSlot0[poolId];
-
         // check if we need to change strategy
         if (slot0.shouldChangeStrategy()) {
-            console.log("[_ensureWinnerStrategyUpdated] shouldChangeStrategy");
+            console.log("[_changeStrategyIfNeeded] shouldChangeStrategy");
             slot0 = slot0
                 .setStrategyAddress(winnerStrategies[poolId])
                 .setShouldChangeStrategy(false);
-            poolSlot0[poolId] = slot0;
         }
 
         return slot0;
     }
 
-    function _updateAuctionStateAndPayRent(PoolKey memory key) internal {
+    function _payRentAndChangeStrategyIfNeeded(PoolKey memory key) internal {
         PoolId poolId = key.toId();
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
@@ -540,31 +540,34 @@ abstract contract ArbiterAmAmmBaseHook is
         uint128 remainingRent = slot1.remainingRent();
 
         console.log(
-            "[_updateAuctionStateAndPayRent] lastPaidBlock: %d",
+            "[_payRentAndChangeStrategyIfNeeded] lastPaidBlock: %d",
             lastPaidBlock
         );
         console.log(
-            "[_updateAuctionStateAndPayRent] remainingRent: %d",
+            "[_payRentAndChangeStrategyIfNeeded] remainingRent: %d",
             remainingRent
         );
         console.log(
-            "[_updateAuctionStateAndPayRent] block.number: %d",
+            "[_payRentAndChangeStrategyIfNeeded] block.number: %d",
             block.number
         );
         if (lastPaidBlock == uint32(block.number)) {
             console.log(
-                "[_updateAuctionStateAndPayRent] lastPaidBlock == block.number"
+                "[_payRentAndChangeStrategyIfNeeded] lastPaidBlock == block.number"
             );
             return;
         }
 
         if (remainingRent == 0) {
-            console.log("[_updateAuctionStateAndPayRent] remainingRent == 0");
+            console.log(
+                "[_payRentAndChangeStrategyIfNeeded] remainingRent == 0"
+            );
             slot1 = slot1.setLastPaidBlock(uint32(block.number));
             poolSlot1[poolId] = slot1;
             return;
         }
-        AuctionSlot0 slot0 = _ensureWinnerStrategyUpdated(key);
+        AuctionSlot0 slot0 = poolSlot0[poolId];
+        slot0 = _changeStrategyIfNeeded(slot0, poolId);
 
         uint32 blocksElapsed;
         unchecked {
@@ -572,18 +575,18 @@ abstract contract ArbiterAmAmmBaseHook is
         }
 
         console.log(
-            "[_updateAuctionStateAndPayRent] blocksElapsed: %d",
+            "[_payRentAndChangeStrategyIfNeeded] blocksElapsed: %d",
             blocksElapsed
         );
         console.log(
-            "[_updateAuctionStateAndPayRent] rentPerBlock: %d",
+            "[_payRentAndChangeStrategyIfNeeded] rentPerBlock: %d",
             slot1.rentPerBlock()
         );
 
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
         console.log(
-            "[_updateAuctionStateAndPayRent] rentAmount: %d",
+            "[_payRentAndChangeStrategyIfNeeded] rentAmount: %d",
             rentAmount
         );
         if (rentAmount > remainingRent) {

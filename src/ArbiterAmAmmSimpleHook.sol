@@ -29,10 +29,13 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 import {DEFAULT_GET_SWAP_FEE_LOG, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "./ArbiterAmAmmBaseHook.sol";
 
-/// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalities.
+/// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
-/// @dev The winner address should implement IArbiterFeeProvider to set the trading fees.
-/// @dev The winner address should be able to manage ERC6909 claim tokens in the PoolManager.
+/// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
+/// @dev The strategy address should be able to manage ERC6909 claim tokens in the PoolManager.
+///
+/// @notice ArbiterAmAmmSimpleHook uses currency0 or currency1 from the pool ( depending on immutable RENT_IN_TOKEN_ZERO ) as the rent currency.
+/// @notice The rent is distributed to the active tick using donate.
 contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
     bool immutable RENT_IN_TOKEN_ZERO;
 

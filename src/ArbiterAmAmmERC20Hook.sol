@@ -34,10 +34,14 @@ import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 import {RewardTracker} from "./RewardTracker.sol";
 import {DEFAULT_GET_SWAP_FEE_LOG, DEFAULT_WINNER_FEE_SHARE, DEFAULT_MINIMUM_RENT_BLOCKS, DEFAULT_OVERBID_FACTOR, DEFAULT_TRANSITION_BLOCKS} from "./ArbiterAmAmmBaseHook.sol";
 
-/// @notice ArbiterAmAmmSimpleHook implements am-AMM auction and hook functionalities.
+/// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
-/// @dev The winner address should implement IArbiterFeeProvider to set the trading fees.
-/// @dev The winner address should be able to manage ERC6909 claim tokens in the PoolManager.
+/// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
+/// @dev The strategy address should be able to manage ERC6909 claim tokens in the PoolManager.
+///
+/// @notice ArbiterAmAmmERC20Hook uses immutable rentCurrency as the rent currency for all trading pairs.
+/// @notice To recieve rent, Liquididty Providers must subscribe to this contract.
+/// @notice To claim the rewards one must call collectRewards.
 contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     using LPFeeLibrary for uint24;
     using CurrencyLibrary for Currency;
@@ -106,7 +110,7 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
-            _updateAuctionStateAndPayRent(key);
+            _payRentAndChangeStrategyIfNeeded(key);
             _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
         }
 
@@ -135,23 +139,23 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     ///////////////////////////////////////////////////////////////////////////////////
 
     function _beforeOnSubscribeTracker(PoolKey memory key) internal override {
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
     }
 
     function _beforeOnUnubscribeTracker(PoolKey memory key) internal override {
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
     }
 
     function _beforeOnModifyLiquidityTracker(
         PoolKey memory key
     ) internal override {
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
     }
 
     function _beforeOnNotifyTransferTracker(
         PoolKey memory key
     ) internal override {
-        _updateAuctionStateAndPayRent(key);
+        _payRentAndChangeStrategyIfNeeded(key);
     }
 
     function collectRewards(address to) external returns (uint256 rewards) {
