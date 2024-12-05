@@ -108,7 +108,7 @@ abstract contract ArbiterAmAmmBaseHook is
                     afterAddLiquidity: false,
                     afterRemoveLiquidity: false,
                     beforeSwap: true,
-                    afterSwap: false,
+                    afterSwap: true,
                     beforeDonate: false,
                     afterDonate: false,
                     beforeSwapReturnsDelta: true,
@@ -165,6 +165,8 @@ abstract contract ArbiterAmAmmBaseHook is
         poolManagerOnly
         returns (bytes4, BeforeSwapDelta, uint24)
     {
+        console.log("[beforeSwap] start");
+        console.log("[beforeSwap] block.number: %d", block.number);
         AuctionSlot0 slot0 = _ensureWinnerStrategyUpdated(key);
         address strategy = slot0.strategyAddress();
         uint24 fee = DEFAULT_FEE;
@@ -216,19 +218,34 @@ abstract contract ArbiterAmAmmBaseHook is
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
         bool exactOut = params.amountSpecified > 0;
 
-        Currency feeCurrency = exactOut == params.zeroForOne
-            ? key.currency0
-            : key.currency1;
+        bool isFeeCurrency0 = exactOut == params.zeroForOne;
 
-        // Send fees to strategy
-        vault.mint(strategy, feeCurrency, strategyFee);
-        if (exactOut) {
-            poolManager.donate(key, lpFee, 0, "");
+        if (exactOut == params.zeroForOne) {
+            console.log("[beforeSwap] feeCurrency key.currency0");
         } else {
-            poolManager.donate(key, 0, lpFee, "");
+            console.log("[beforeSwap] feeCurrency key.currency1");
         }
 
-        // Override LP fee to zero
+        if (exactOut) {
+            console.log("[beforeSwap] exactOut");
+        } else {
+            console.log("[beforeSwap] exactIn");
+        }
+
+        // Send fees to strategy
+        vault.mint(
+            strategy,
+            isFeeCurrency0 ? key.currency0 : key.currency1,
+            strategyFee
+        );
+
+        if (isFeeCurrency0) {
+            console.log("[beforeSwap] donate amount0");
+            poolManager.donate(key, lpFee, 0, "");
+        } else {
+            console.log("[beforeSwap] donate amount1");
+            poolManager.donate(key, 0, lpFee, "");
+        }
 
         return (
             this.beforeSwap.selector,
@@ -251,6 +268,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
+            console.log("[afterSwap] tick != slot0.lastActiveTick()");
             _updateAuctionStateAndPayRent(key);
         }
 
@@ -553,8 +571,21 @@ abstract contract ArbiterAmAmmBaseHook is
             blocksElapsed = uint32(block.number) - lastPaidBlock;
         }
 
+        console.log(
+            "[_updateAuctionStateAndPayRent] blocksElapsed: %d",
+            blocksElapsed
+        );
+        console.log(
+            "[_updateAuctionStateAndPayRent] rentPerBlock: %d",
+            slot1.rentPerBlock()
+        );
+
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
+        console.log(
+            "[_updateAuctionStateAndPayRent] rentAmount: %d",
+            rentAmount
+        );
         if (rentAmount > remainingRent) {
             // pay the remainingRent and reset the auction - no winner
             rentAmount = remainingRent;

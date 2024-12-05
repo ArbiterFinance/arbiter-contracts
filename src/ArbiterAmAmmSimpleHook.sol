@@ -72,6 +72,10 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         PoolKey memory key,
         uint128 rentAmount
     ) internal override {
+        console.log(
+            "[ArbiterAmAmmSimpleHook._distributeRent] rentAmount",
+            rentAmount
+        );
         vault.burn(address(this), _getPoolRentCurrency(key), rentAmount);
         poolManager.donate(key, rentAmount, 0, "");
     }
