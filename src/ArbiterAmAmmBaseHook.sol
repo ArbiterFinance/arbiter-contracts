@@ -67,23 +67,37 @@ abstract contract ArbiterAmAmmBaseHook is
     uint32 internal _transitionBlocks;
     uint32 internal _minRentBlocks;
     uint32 internal _overbidFactor;
+    uint32 internal _auctionFee;
 
     mapping(PoolId => AuctionSlot0) public poolSlot0;
     mapping(PoolId => AuctionSlot1) public poolSlot1;
     mapping(PoolId => address) public winners;
     mapping(PoolId => address) public winnerStrategies;
     mapping(address => mapping(Currency => uint256)) public deposits;
+    mapping(PoolId => AuctionFee) public auctionFees;
+
+    struct AuctionFee {
+        uint128 initialRemainingRent;
+        uint128 feeLocked;
+        uint128 collectedFee;
+    }
 
     constructor(
         ICLPoolManager _poolManager,
         address _initOwner,
         uint32 transitionBlocks_,
         uint32 minRentBlocks_,
-        uint32 overbidFactor_
+        uint32 overbidFactor_,
+        uint32 auctionFee_
     ) CLBaseHook(_poolManager) Ownable(_initOwner) {
         _transitionBlocks = transitionBlocks_;
         _minRentBlocks = minRentBlocks_;
         _overbidFactor = overbidFactor_;
+        _auctionFee = auctionFee_;
+        require(
+            _auctionFee >= 1e6 && _auctionFee <= 1.1e6,
+            "Invalid auction fee"
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -416,11 +430,27 @@ abstract contract ArbiterAmAmmBaseHook is
         Currency currency = _getPoolRentCurrency(key);
 
         // refund the remaining rentPerBlock to the previous winner
-        deposits[winners[poolId]][currency] += slot1.remainingRent();
+        uint128 remainingRent = slot1.remainingRent();
+        if (remainingRent > 0) {
+            AuctionFee memory prevAuctionFee = auctionFees[poolId];
+
+            uint128 feeRefund = uint128(
+                (uint256(prevAuctionFee.feeLocked) * remainingRent) /
+                    prevAuctionFee.initialRemainingRent
+            );
+            uint128 collectedFee = prevAuctionFee.feeLocked - feeRefund;
+
+            deposits[winners[poolId]][currency] +=
+                slot1.remainingRent() +
+                feeRefund;
+            auctionFees[poolId] = AuctionFee(0, 0, collectedFee);
+        }
 
         // charge the new winner
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
-        uint120 requiredDeposit = rentPerBlock * rentBlockLength;
+        uint128 totalRent = rentPerBlock * rentBlockLength;
+        uint128 requiredDeposit = (totalRent * _auctionFee) / 1e6;
+        uint128 auctionFee = requiredDeposit - totalRent;
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
 
@@ -437,6 +467,9 @@ abstract contract ArbiterAmAmmBaseHook is
             .setRemainingRent(requiredDeposit)
             .setLastPaidBlock(uint32(block.number))
             .setRentPerBlock(rentPerBlock);
+
+        auctionFees[poolId].initialRemainingRent = totalRent;
+        auctionFees[poolId].feeLocked = auctionFee;
 
         winners[poolId] = msg.sender;
         winnerStrategies[poolId] = strategy;
