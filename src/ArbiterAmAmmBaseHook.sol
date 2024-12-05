@@ -146,6 +146,8 @@ abstract contract ArbiterAmAmmBaseHook is
             .wrap(bytes32(0))
             .setWinnerFeeSharePart(DEFAULT_WINNER_FEE_SHARE)
             .setStrategyGasLimit(DEFAULT_GET_SWAP_FEE_LOG)
+            .setDefaultSwapFee(DEFAULT_DEFAULT_POOL_SWAP_FEE)
+            .setMaximumSwapFee(MAX_POOL_SWAP_FEE)
             .setLastActiveTick(tick);
 
         return this.beforeInitialize.selector;
@@ -183,7 +185,7 @@ abstract contract ArbiterAmAmmBaseHook is
         slot0 = _changeStrategyIfNeeded(slot0, poolId);
         poolSlot0[poolId] = slot0;
         address strategy = slot0.strategyAddress();
-        uint24 fee = DEFAULT_FEE;
+        uint24 fee = slot0.defaultSwapFee();
         // If no strategy is set, the swap fee is just set to the default value
 
         if (strategy == address(0)) {
@@ -196,18 +198,16 @@ abstract contract ArbiterAmAmmBaseHook is
 
         // Call strategy contract to get swap fee.
         try
-            IArbiterFeeProvider(strategy).getSwapFee(
-                sender,
-                key,
-                params,
-                hookData
-            )
+            IArbiterFeeProvider(strategy).getSwapFee{
+                gas: 2 << slot0.strategyGasLimit()
+            }(sender, key, params, hookData)
         returns (uint24 _fee) {
+            uint24 maxFee = slot0.maximumSwapFee();
             console.log("[beforeSwap] _fee: %d", _fee);
-            if (_fee < MAX_POOL_SWAP_FEE) {
+            if (_fee < maxFee) {
                 fee = _fee;
             } else {
-                fee = MAX_POOL_SWAP_FEE;
+                fee = maxFee;
             }
         } catch {}
         console.log("[beforeSwap] fee: %d", fee);
@@ -446,7 +446,7 @@ abstract contract ArbiterAmAmmBaseHook is
         // charge the new winner
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
         uint128 totalRent = rentPerBlock * rentBlockLength;
-        uint128 auctionFee = (requiredDeposit * _auctionFee) / 1e6;
+        uint128 auctionFee = (totalRent * _auctionFee) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
@@ -650,4 +650,66 @@ abstract contract ArbiterAmAmmBaseHook is
     function _getPoolRentCurrency(
         PoolKey memory key
     ) internal view virtual returns (Currency);
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////// only Owner ///////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    function setTransitionBlocks(uint32 transitionBlocks_) external onlyOwner {
+        _transitionBlocks = transitionBlocks_;
+    }
+
+    function setMinRentBlocks(uint32 minRentBlocks_) external onlyOwner {
+        _minRentBlocks = minRentBlocks_;
+    }
+
+    function setOverbidFactor(uint32 overbidFactor_) external onlyOwner {
+        _overbidFactor = overbidFactor_;
+    }
+
+    function setAuctionFee(uint32 auctionFee_) external onlyOwner {
+        require(auctionFee_ <= 1e5, "Invalid auction fee");
+        _auctionFee = auctionFee_;
+    }
+
+    //      * - [192..208): `winner fee part` (16 bits) - The portion of the fee paid to the auction winner, expressed in basis points.
+    //  * - [208..216): `strategy gas limit` (8 bits) - The maximum gas allocation for executing the strategy.
+    //  * - [216..232): `default swap fee` (16 bits) - The default fee applied to swaps in basis points.
+    //  * - [232..256): `maximum swap fee` (24 bits) - The maximum allowable fee for swaps in basis points.
+
+    function setWinnerFeeSharePart(
+        PoolKey calldata key,
+        uint16 winnerFeeSharePart
+    ) external onlyOwner {
+        poolSlot0[key.toId()] = poolSlot0[key.toId()].setWinnerFeeSharePart(
+            winnerFeeSharePart
+        );
+    }
+
+    function setStrategyGasLimit(
+        PoolKey calldata key,
+        uint8 strategyGasLimit
+    ) external onlyOwner {
+        poolSlot0[key.toId()] = poolSlot0[key.toId()].setStrategyGasLimit(
+            strategyGasLimit
+        );
+    }
+
+    function setDefaultSwapFee(
+        PoolKey calldata key,
+        uint16 defaultSwapFee
+    ) external onlyOwner {
+        poolSlot0[key.toId()] = poolSlot0[key.toId()].setDefaultSwapFee(
+            defaultSwapFee
+        );
+    }
+
+    function setMaximumSwapFee(
+        PoolKey calldata key,
+        uint24 maximumSwapFee
+    ) external onlyOwner {
+        poolSlot0[key.toId()] = poolSlot0[key.toId()].setMaximumSwapFee(
+            maximumSwapFee
+        );
+    }
 }
