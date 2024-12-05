@@ -57,14 +57,16 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         address initOwner_,
         uint32 transitionBlocks_,
         uint32 minRentBlocks_,
-        uint32 overbidFactor_
+        uint32 overbidFactor_,
+        uint32 auctionFee_
     )
         ArbiterAmAmmBaseHook(
             poolManager_,
             initOwner_,
             transitionBlocks_,
             minRentBlocks_,
-            overbidFactor_
+            overbidFactor_,
+            auctionFee_
         )
         RewardTracker(positionManager_)
     {
