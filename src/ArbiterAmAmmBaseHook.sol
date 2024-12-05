@@ -94,10 +94,7 @@ abstract contract ArbiterAmAmmBaseHook is
         _minRentBlocks = minRentBlocks_;
         _overbidFactor = overbidFactor_;
         _auctionFee = auctionFee_;
-        require(
-            _auctionFee >= 1e6 && _auctionFee <= 1.1e6,
-            "Invalid auction fee"
-        );
+        require(_auctionFee <= 1e5, "Invalid auction fee");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -449,8 +446,8 @@ abstract contract ArbiterAmAmmBaseHook is
         // charge the new winner
         uint64 rentBlockLength = rentEndBlock - uint64(block.number);
         uint128 totalRent = rentPerBlock * rentBlockLength;
-        uint128 requiredDeposit = (totalRent * _auctionFee) / 1e6;
-        uint128 auctionFee = requiredDeposit - totalRent;
+        uint128 auctionFee = (requiredDeposit * _auctionFee) / 1e6;
+        uint128 requiredDeposit = totalRent + auctionFee;
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
 
