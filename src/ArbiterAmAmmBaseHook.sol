@@ -680,4 +680,24 @@ abstract contract ArbiterAmAmmBaseHook is
     ) external onlyOwner {
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setAuctionFee(auctionFee);
     }
+
+    function collectAuctionFees(
+        PoolKey calldata key,
+        address to
+    ) external onlyOwner {
+        PoolId poolId = key.toId();
+        uint128 collectedFee = auctionFees[poolId].collectedFee;
+        auctionFees[poolId].collectedFee = 0;
+
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    Currency.unwrap(_getPoolRentCurrency(key)),
+                    to,
+                    0,
+                    collectedFee
+                )
+            )
+        );
+    }
 }
