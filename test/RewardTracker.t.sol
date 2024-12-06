@@ -521,4 +521,57 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             "Rewards accumulated for the position should be the same"
         );
     }
+
+    // two positions by user1 and user 2, both in range, same liquidity
+
+    function test_RewardTrackerHookTest_TwoPositionsInRange() public {
+        currency0.transfer(user1, 1);
+        currency1.transfer(user1, 1);
+        currency0.transfer(user2, 1);
+        currency1.transfer(user2, 1);
+        int24 tickLower = -60;
+        int24 tickUpper = 60;
+
+        uint256 tokenId1 = positionManager.nextTokenId();
+        console.log("before addLiquidity user1");
+        addLiquidity(key, 1, 1, tickLower, tickUpper, user1);
+        vm.startPrank(user1);
+        positionManager.subscribe(tokenId1, address(trackerHook), ZERO_BYTES);
+        vm.stopPrank();
+
+        uint256 tokenId2 = positionManager.nextTokenId();
+        addLiquidity(key, 1, 1, tickLower, tickUpper, user2);
+        vm.startPrank(user2);
+        positionManager.subscribe(tokenId2, address(trackerHook), ZERO_BYTES);
+        vm.stopPrank();
+
+        console.log("before donate");
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        trackerHook.accrueRewards(tokenId1);
+        trackerHook.accrueRewards(tokenId2);
+
+        uint256 rewards1 = trackerHook.accruedRewards(user1);
+        uint256 rewards2 = trackerHook.accruedRewards(user2);
+
+        assertEq(
+            rewards1,
+            rewards2,
+            "Rewards accumulated for both positions should be the same"
+        );
+
+        assertApproxEqRel(
+            rewards1,
+            0.5 ether,
+            1e17,
+            "Rewards should be split equally between the two positions"
+        );
+
+        assertApproxEqRel(
+            rewards2,
+            0.5 ether,
+            1e17,
+            "Rewards should be split equally between the two positions"
+        );
+    }
 }

@@ -138,9 +138,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         console.log("arbiterHook", address(arbiterHook));
     }
 
-    function transferToUser1AndDepositAs(uint256 amount) public {
-        currency0.transfer(user1, amount);
-        vm.startPrank(user1);
+    function transferToAndDepositAs(uint256 amount, address user) public {
+        currency0.transfer(user, amount);
+        vm.startPrank(user);
         IERC20(Currency.unwrap(currency0)).approve(
             address(arbiterHook),
             amount
@@ -158,9 +158,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         vm.roll(CURRENT_BLOCK_NUMBER);
     }
 
-    function testBiddingAndRentPayment() public {
+    function test_ArbiterAmAmmSimpleHook_BiddingAndRentPayment() public {
         resetCurrentBlock();
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         //offset blocks
         moveBlockBy(100);
 
@@ -195,13 +195,13 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         // TODO: test rent payment
     }
 
-    function testStrategyContractSetsFee() public {
+    function test_ArbiterAmAmmSimpleHook_StrategyContractSetsFee() public {
         resetCurrentBlock();
         // Deploy a mock strategy that sets swap fee to DEFAULT_POOL_SWAP_FEE
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -259,13 +259,13 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testStrategyFeeCappedAtMaxFee() public {
+    function test_ArbiterAmAmmSimpleHook_StrategyFeeCappedAtMaxFee() public {
         resetCurrentBlock();
         // Deploy a mock strategy that sets swap fee to a value greater than DEFAULT_POOL_SWAP_FEE
         uint24 strategyFee = 1e6 + 1000; // Fee greater than DEFAULT_POOL_SWAP_FEE
         MockStrategy strategy = new MockStrategy(strategyFee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -314,11 +314,11 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testDepositAndWithdraw() public {
+    function test_ArbiterAmAmmSimpleHook_DepositAndWithdraw() public {
         resetCurrentBlock();
         // User1 deposits currency0
 
-        transferToUser1AndDepositAs(100e18);
+        transferToAndDepositAs(100e18, user1);
 
         uint256 depositBalance = arbiterHook.depositOf(
             Currency.unwrap(currency0),
@@ -359,10 +359,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         vm.stopPrank();
     }
 
-    function testChangeStrategy() public {
+    function test_ArbiterAmAmmSimpleHook_ChangeStrategy() public {
         resetCurrentBlock();
         // User1 overbids and becomes the winner
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -388,7 +388,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testRevertIfNotDynamicFee() public {
+    function test_ArbiterAmAmmSimpleHook_RevertIfNotDynamicFee() public {
         resetCurrentBlock();
         PoolKey memory nonDynamicKey = PoolKey({
             currency0: currency0,
@@ -413,10 +413,10 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         poolManager.initialize(nonDynamicKey, Constants.SQRT_RATIO_1_1);
     }
 
-    function testRentTooLow() public {
+    function test_ArbiterAmAmmSimpleHook_RentTooLow() public {
         resetCurrentBlock();
         // User1 deposits currency0
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.prank(user1);
         arbiterHook.overbid(
@@ -434,10 +434,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testNotWinnerCannotChangeStrategy() public {
+    function test_ArbiterAmAmmSimpleHook_NotWinnerCannotChangeStrategy()
+        public
+    {
         resetCurrentBlock();
         // User1 overbids and becomes the winner
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -453,7 +455,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         arbiterHook.changeStrategy(key, address(0));
     }
 
-    function testDefaultFeeWhenNoOneHasWon() public {
+    function test_ArbiterAmAmmSimpleHook_DefaultFeeWhenNoOneHasWon() public {
         resetCurrentBlock();
         // Ensure there is no winner and no strategy set
         address currentWinner = arbiterHook.winner(key);
@@ -515,13 +517,15 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testDefaultFeeAfterAuctionWinExpired() public {
+    function test_ArbiterAmAmmSimpleHook_DefaultFeeAfterAuctionWinExpired()
+        public
+    {
         resetCurrentBlock();
         // Deploy a mock strategy that sets swap fee to DEFAULT_POOL_SWAP_FEE
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
 
         // Set rent to expire in 300 blocks
@@ -629,7 +633,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testDepositOf() public {
+    function test_ArbiterAmAmmSimpleHook_DepositOf() public {
         resetCurrentBlock();
         uint256 initialDeposit = arbiterHook.depositOf(
             Currency.unwrap(currency0),
@@ -637,7 +641,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
         assertEq(initialDeposit, 0, "Initial deposit should be zero");
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         uint256 postDeposit = arbiterHook.depositOf(
             Currency.unwrap(currency0),
@@ -650,7 +654,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testBiddingCurrency() public {
+    function test_ArbiterAmAmmSimpleHook_BiddingCurrency() public {
         resetCurrentBlock();
         address expectedCurrency = Currency.unwrap(currency0);
         address actualCurrency = arbiterHook.biddingCurrency(key);
@@ -661,7 +665,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testActiveStrategySameBlockAsOverbid() public {
+    function test_ArbiterAmAmmSimpleHook_ActiveStrategySameBlockAsOverbid()
+        public
+    {
         resetCurrentBlock();
         address initialStrategy = arbiterHook.activeStrategy(key);
         assertEq(
@@ -671,7 +677,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -693,7 +699,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testActiveStrategyDifferentBlock() public {
+    function test_ArbiterAmAmmSimpleHook_ActiveStrategyDifferentBlock() public {
         resetCurrentBlock();
         address initialStrategy = arbiterHook.activeStrategy(key);
         assertEq(
@@ -703,7 +709,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -727,7 +733,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testWinnerStrategy() public {
+    function test_ArbiterAmAmmSimpleHook_WinnerStrategy() public {
         resetCurrentBlock();
         address initialWinnerStrategy = arbiterHook.winnerStrategy(key);
         assertEq(
@@ -738,7 +744,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -757,7 +763,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testWinner() public {
+    function test_ArbiterAmAmmSimpleHook_Winner() public {
         resetCurrentBlock();
         address initialWinner = arbiterHook.winner(key);
         assertEq(
@@ -768,7 +774,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
 
@@ -784,14 +790,14 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         assertEq(currentWinner, user1, "Winner was not set correctly");
     }
 
-    function testRentPerBlock() public {
+    function test_ArbiterAmAmmSimpleHook_RentPerBlock() public {
         resetCurrentBlock();
         AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
         uint96 initialRentPerBlock = slot1.rentPerBlock();
         assertEq(initialRentPerBlock, 0, "Initial rentPerBlock should be zero");
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -830,7 +836,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testRentEndBlock() public {
+    function test_ArbiterAmAmmSimpleHook_RentEndBlock() public {
         resetCurrentBlock();
         AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
         uint64 initialRentEndBlock = slot1.rentEndBlock();
@@ -847,7 +853,7 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         console.log("desiredRentEndBlock", desiredRentEndBlock);
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(key, 10e18, desiredRentEndBlock, address(strategy));
@@ -864,12 +870,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testExactOutZeroForOne() public {
+    function test_ArbiterAmAmmSimpleHook_ExactOutZeroForOne() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -892,12 +898,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
             })
         );
     }
-    function testExactOutOneForZero() public {
+    function test_ArbiterAmAmmSimpleHook_ExactOutOneForZero() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -921,12 +927,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testExactInZeroForOne() public {
+    function test_ArbiterAmAmmSimpleHook_ExactInZeroForOne() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -950,12 +956,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testExactInOneForZero() public {
+    function test_ArbiterAmAmmSimpleHook_ExactInOneForZero() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -980,13 +986,15 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testWinnerCanChangeFeeAndSwapReflects() public {
+    function test_ArbiterAmAmmSimpleHook_WinnerCanChangeFeeAndSwapReflects()
+        public
+    {
         resetCurrentBlock();
         uint24 initialFee = 1000;
         uint24 updatedFee = 2000;
         MockStrategy strategy = new MockStrategy(initialFee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -1029,9 +1037,9 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
     }
 
     /// test executing 3 swaps, after each checks remainingRent decreasing appropriately (calling via remainingRent)
-    function testRemainingRentDecreases() public {
+    function test_ArbiterAmAmmSimpleHook_RemainingRentDecreases() public {
         resetCurrentBlock();
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         // User1 overbids
         vm.prank(user1);
@@ -1131,12 +1139,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testMultipleSwapsSameBlock() public {
+    function test_ArbiterAmAmmSimpleHook_MultipleSwapsSameBlock() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -1169,12 +1177,12 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         );
     }
 
-    function testOverbidAndSwapSameBlock() public {
+    function test_ArbiterAmAmmSimpleHook_OverbidAndSwapSameBlock() public {
         resetCurrentBlock();
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToUser1AndDepositAs(10_000e18);
+        transferToAndDepositAs(10_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -1194,6 +1202,595 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
                 amountOutMinimum: 0,
                 hookData: ZERO_BYTES
             })
+        );
+    }
+
+    function test_ArbiterAmAmmSimpleHook_OverbidMultipleBids() public {
+        resetCurrentBlock();
+        uint24 feeUser1 = 1000;
+        uint24 feeUser2 = 500;
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(10_000e18, user1);
+        vm.startPrank(user1);
+        arbiterHook.overbid(key, 10e18, rentEndBlock, address(strategyUser1));
+        vm.stopPrank();
+        moveBlockBy(1);
+
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 feeAmountUser1 = (amountIn * feeUser1) / 1e6;
+        uint256 expectedFeeAmountUser1 = (feeAmountUser1 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+
+        uint256 strategyUser1Balance = vault.balanceOf(
+            address(strategyUser1),
+            key.currency1
+        );
+        assertEq(
+            strategyUser1Balance,
+            expectedFeeAmountUser1,
+            "Strategy user1 did not receive correct fees after first swap"
+        );
+
+        transferToAndDepositAs(20_000e18, user2);
+
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            11e18,
+            rentEndBlock + 100,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+        moveBlockBy(1);
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
+        uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency1
+        );
+        assertEq(
+            strategyUser2Balance,
+            expectedFeeAmountUser2,
+            "Strategy user2 did not receive correct fees after second swap"
+        );
+
+        uint256 strategyUser1BalanceAfter = vault.balanceOf(
+            address(strategyUser1),
+            key.currency1
+        );
+        assertEq(
+            strategyUser1BalanceAfter,
+            strategyUser1Balance,
+            "User1 strategy unexpectedly earned additional fees after losing the auction"
+        );
+    }
+
+    function test_ArbiterAmAmmSimpleHook_AuctionFeeDepositRequirement() public {
+        resetCurrentBlock();
+
+        arbiterHook.setAuctionFee(key, 500);
+
+        uint80 totalRent = 10e18;
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        uint80 auctionFee = (totalRent * hookAuctionFee) / 1e6;
+        uint80 requiredDeposit = totalRent + auctionFee;
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(totalRent, user1);
+
+        vm.prank(user1);
+        vm.expectRevert(IArbiterAmAmmHarbergerLease.RentTooLow.selector);
+        arbiterHook.overbid(key, totalRent, rentEndBlock, address(0));
+
+        transferToAndDepositAs(auctionFee, user1);
+
+        vm.prank(user1);
+        arbiterHook.overbid(key, totalRent, rentEndBlock, address(0));
+
+        address winner = arbiterHook.winner(key);
+        assertEq(
+            winner,
+            user1,
+            "User1 should be the winner after depositing the full required amount"
+        );
+    }
+
+    function test_ArbiterAmAmmSimpleHook_TwoUsersOverbidSameBlock() public {
+        resetCurrentBlock();
+        uint24 feeUser1 = 1000;
+        uint24 feeUser2 = 2000;
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        console.log("User1 deposits and overbids");
+        uint80 user1Rent = 10e18;
+        uint80 user1Deposit = user1Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+
+        transferToAndDepositAs(user1Deposit, user1);
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1Rent,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        console.log(
+            "User2 deposits and overbids with a higher amount in the same block"
+        );
+        uint80 user2Rent = 20e18;
+        transferToAndDepositAs(user2Rent * DEFAULT_MINIMUM_RENT_BLOCKS, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2Rent,
+            rentEndBlock,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        console.log(
+            "Since user2's overbid is higher and occurred in the same block, user2 should win"
+        );
+        address winner = arbiterHook.winner(key);
+        assertEq(
+            winner,
+            user2,
+            "User2 should be the winner after the higher overbid in the same block"
+        );
+
+        console.log("Execute a swap to see fees go to user2 strategy");
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        console.log("Calculate expected fees for user2 strategy");
+        uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
+        uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency1
+        );
+        assertEq(
+            strategyUser2Balance,
+            expectedFeeAmountUser2,
+            "Strategy user2 did not receive the correct fees after winning"
+        );
+
+        console.log(
+            "Check that user1 can withdraw their entire deposit after losing the top position"
+        );
+        uint256 user1DepositBefore = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+        assertEq(
+            user1DepositBefore,
+            user1Deposit,
+            "User1's deposit should still be intact"
+        );
+
+        vm.startPrank(user1);
+        arbiterHook.withdraw(Currency.unwrap(currency0), user1Deposit);
+        vm.stopPrank();
+
+        uint256 user1DepositAfter = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+        assertEq(
+            user1DepositAfter,
+            0,
+            "User1 should be able to withdraw their full deposit after losing"
+        );
+
+        uint256 user1BalancePostWithdraw = key.currency0.balanceOf(user1);
+
+        assertEq(
+            user1BalancePreDeposit,
+            user1BalancePostWithdraw,
+            "User1 should have their deposit returned to their wallet"
+        );
+    }
+
+    function test_ArbiterAmAmmSimpleHook_TwoUsersOverbidSameBlockWithAuctionFee()
+        public
+    {
+        resetCurrentBlock();
+
+        arbiterHook.setAuctionFee(key, 500);
+
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        uint24 feeUser1 = 1000;
+        uint24 feeUser2 = 2000;
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        console.log("User1 deposits and overbids");
+        uint80 user1Rent = 10e18;
+        uint128 user1TotalRent = user1Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+        console.log("user1TotalRent: ", user1TotalRent);
+        uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6;
+        console.log("user1AuctionFee: ", user1AuctionFee);
+        uint128 user1Deposit = user1TotalRent + user1AuctionFee;
+
+        console.log("user1Deposit: ", user1Deposit);
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+
+        transferToAndDepositAs(user1Deposit, user1);
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1Rent,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        console.log(
+            "User2 deposits and overbids with a higher amount in the same block"
+        );
+        uint80 user2Rent = 20e18;
+        uint128 user2TotalRent = user2Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6;
+        uint128 user2Deposit = user2TotalRent + user2AuctionFee;
+
+        transferToAndDepositAs(user2Deposit, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2Rent,
+            rentEndBlock,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        console.log(
+            "Since user2's overbid is higher and occurred in the same block, user2 should win"
+        );
+        address winner = arbiterHook.winner(key);
+        assertEq(
+            winner,
+            user2,
+            "User2 should be the winner after the higher overbid in the same block"
+        );
+
+        console.log("Execute a swap to see fees go to user2 strategy");
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        (
+            uint128 initialRemainingRent,
+            uint128 feeLocked,
+            uint128 collectedFee
+        ) = arbiterHook.auctionFees(id);
+        assertEq(
+            feeLocked,
+            user2AuctionFee,
+            "Auction fee should be collected for user2"
+        );
+
+        assertEq(
+            initialRemainingRent,
+            user2TotalRent,
+            "Initial remaining rent should be equal to user2's total rent"
+        );
+
+        assertEq(
+            collectedFee,
+            0,
+            "Collected fee should be zero before the swap"
+        );
+
+        console.log("Calculate expected fees for user2 strategy");
+        uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
+        uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency1
+        );
+        assertEq(
+            strategyUser2Balance,
+            expectedFeeAmountUser2,
+            "Strategy user2 did not receive the correct fees after winning"
+        );
+
+        console.log(
+            "Check that user1 can withdraw their entire deposit after losing the top position"
+        );
+        uint256 user1DepositBefore = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+        assertEq(
+            user1DepositBefore,
+            user1Deposit,
+            "User1's deposit should still be intact"
+        );
+
+        vm.startPrank(user1);
+        arbiterHook.withdraw(Currency.unwrap(currency0), user1Deposit);
+        vm.stopPrank();
+
+        uint256 user1DepositAfter = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+        assertEq(
+            user1DepositAfter,
+            0,
+            "User1 should be able to withdraw their full deposit after losing"
+        );
+
+        uint256 user1BalancePostWithdraw = key.currency0.balanceOf(user1);
+
+        assertEq(
+            user1BalancePreDeposit,
+            user1BalancePostWithdraw,
+            "User1 should have their deposit returned to their wallet"
+        );
+    }
+
+    function test_ArbiterAmAmmSimpleHook_ComplexAuctionScenario() public {
+        // Scenario:
+        // 1. Set an auction fee.
+        // 2. User1 deposits and overbids, becoming the winner.
+        // 3. After 10 blocks, perform a swap -> User1 pays rent for 10 blocks, User1 strategy collects fees.
+        // 4. User2 deposits and overbids with a higher rent in a new block, becoming the new winner.
+        //    Upon takeover, User1 gets refunded remaining rent + a portion of the previously locked fee (feeRefund).
+        // 5. After another 10 blocks, perform a second swap -> User2 pays rent for 10 blocks, User2 strategy collects fees.
+        // 6. User1, who is no longer the winner, can now withdraw their remaining deposit, including refunded rent and fee portion.
+        // 7. Verify protocol fee distribution and that User1 ends up with the correct refunded amounts.
+
+        resetCurrentBlock();
+
+        // Set auction fee to 500 (0.05%)
+        arbiterHook.setAuctionFee(key, 500);
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        // Define rents and strategies
+        uint24 feeUser1 = 1000; // 0.1%
+        uint24 feeUser2 = 2000; // 0.2%
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        // User1 scenario
+        uint80 user1RentPerBlock = 10e18;
+        uint128 user1TotalRent = user1RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
+        uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
+        uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+        transferToAndDepositAs(user1Deposit, user1);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1RentPerBlock,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint128 remainingRentAfterSwapUser1 = arbiterHook
+            .poolSlot1(id)
+            .remainingRent();
+
+        assertEq(
+            remainingRentAfterSwapUser1,
+            user1TotalRent - 10 * user1RentPerBlock,
+            "Remaining rent should be less than user1's total rent after first swap"
+        );
+
+        uint256 feeAmountUser1 = (amountIn * feeUser1) / 1e6;
+        uint256 expectedFeeAmountUser1 = (feeAmountUser1 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+        uint256 strategyUser1Balance = vault.balanceOf(
+            address(strategyUser1),
+            key.currency1
+        );
+        assertEq(
+            strategyUser1Balance,
+            expectedFeeAmountUser1,
+            "Strategy user1 did not receive correct fees after first swap"
+        );
+
+        uint80 user2RentPerBlock = 20e18;
+        uint128 user2TotalRent = user2RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
+        uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
+        uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
+
+        uint32 rentEndBlock2 = uint32(
+            STARTING_BLOCK + 10 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(user2Deposit, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2RentPerBlock,
+            rentEndBlock2,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
+        uint128 remainingRentAfterUser2Overbid = slot1.remainingRent();
+
+        address currentWinner = arbiterHook.winner(key);
+        assertEq(currentWinner, user2, "User2 should be the new winner");
+
+        (
+            uint128 initialRemainingRent,
+            uint128 feeLocked,
+            uint128 collectedFee
+        ) = arbiterHook.auctionFees(id);
+        assertEq(
+            feeLocked,
+            user2AuctionFee,
+            "Auction fee should be collected for user2"
+        );
+
+        assertEq(
+            initialRemainingRent,
+            user2TotalRent,
+            "Initial remaining rent should be equal to user2's total rent"
+        );
+
+        console.log("user1 auctionFee", user1AuctionFee);
+        console.log("collectedFee", collectedFee);
+
+        uint128 feeRefund = uint128(
+            (uint256(user1AuctionFee) * remainingRentAfterSwapUser1) /
+                user1TotalRent
+        );
+
+        assertEq(
+            collectedFee,
+            user1AuctionFee - feeRefund,
+            "Collected fee should be greater than zero after user2 overbid - user1 fee refund but part of it got captured"
+        );
+
+        moveBlockBy(10);
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
+        uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency1
+        );
+        assertEq(
+            strategyUser2Balance,
+            expectedFeeAmountUser2,
+            "Strategy user2 did not receive correct fees after second swap"
+        );
+
+        uint256 user1FinalDeposit = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+
+        vm.startPrank(user1);
+        arbiterHook.withdraw(Currency.unwrap(currency0), user1FinalDeposit);
+        vm.stopPrank();
+
+        uint256 user1FinalDepositAfter = arbiterHook.depositOf(
+            Currency.unwrap(currency0),
+            user1
+        );
+        assertEq(
+            user1FinalDepositAfter,
+            0,
+            "User1 should be able to withdraw the entire refunded deposit"
+        );
+
+        uint256 user1BalancePostWithdraw = key.currency0.balanceOf(user1);
+        assertTrue(
+            user1BalancePostWithdraw >= user1BalancePreDeposit,
+            "User1 should end up with at least their initial balance (including refunds)"
         );
     }
 }

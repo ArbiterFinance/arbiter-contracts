@@ -428,9 +428,15 @@ abstract contract ArbiterAmAmmBaseHook is
         uint128 totalRent = rentPerBlock * rentBlockLength;
         uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
+
+        console.log("[overbid] totalRent: %d", totalRent);
+        console.log("[overbid] auctionFee: %d", auctionFee);
+        console.log("[overbid] requiredDeposit: %d", requiredDeposit);
+
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
 
+            console.log("[overbid] availableDeposit: %d", availableDeposit);
             if (availableDeposit < requiredDeposit) {
                 revert InsufficientDeposit();
             }
