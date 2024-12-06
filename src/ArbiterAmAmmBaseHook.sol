@@ -357,6 +357,8 @@ abstract contract ArbiterAmAmmBaseHook is
         // Deposit 6909 claim tokens to Uniswap V4 PoolManager. The claim tokens are owned by this contract.
         vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
         deposits[msg.sender][Currency.wrap(asset)] += amount;
+
+        emit Deposit(msg.sender, asset, amount);
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -448,6 +450,8 @@ abstract contract ArbiterAmAmmBaseHook is
 
         winners[poolId] = msg.sender;
         winnerStrategies[poolId] = strategy;
+
+        emit Overbid(msg.sender, poolId, rentPerBlock, rentEndBlock, strategy);
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -461,6 +465,8 @@ abstract contract ArbiterAmAmmBaseHook is
         }
         // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
         vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
+
+        emit Withdraw(msg.sender, asset, amount);
     }
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
@@ -477,6 +483,8 @@ abstract contract ArbiterAmAmmBaseHook is
         }
         winnerStrategies[poolId] = strategy;
         poolSlot0[poolId].setShouldChangeStrategy(true);
+
+        emit ChangeStrategy(msg.sender, poolId, strategy);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
