@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
+import {PoolId} from "pancake-v4-core/src/types/PoolId.sol";
 
 /// @title Arbiter AmAmm Harberger Lease
 /// @notice Interface for an auction system based on Harberger Tax principles.
@@ -15,6 +16,25 @@ interface IArbiterAmAmmHarbergerLease {
     error InsufficientDeposit();
     error CallerNotWinner();
     error InvalidWinnerFeeShare();
+
+    event Deposit(
+        address indexed account,
+        address indexed asset,
+        uint256 amount
+    );
+    event Withdraw(
+        address indexed account,
+        address indexed asset,
+        uint256 amount
+    );
+    event Overbid(
+        address indexed winner,
+        PoolId indexed id,
+        uint80 rentPerBlock,
+        uint32 rentEndBlock,
+        address strategy
+    );
+    event ChangeStrategy(PoolId indexed id, address strategy);
 
     /// @return  The minimum time in blocks that an overbidding rent must last
     function minimumRentBlocks(
