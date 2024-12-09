@@ -39,119 +39,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {PoolExtension} from "../src/libraries/PoolExtension.sol";
 import {PositionExtension} from "../src/libraries/PositionExtension.sol";
 import {CLPositionInfo, CLPositionInfoLibrary} from "pancake-v4-periphery/src/pool-cl/libraries/CLPositionInfoLibrary.sol";
-
-import "forge-std/console.sol";
-
-contract NoOpRewardTracker is CLBaseHook, RewardTracker {
-    using CLPoolParametersHelper for bytes32;
-    using PoolExtension for PoolExtension.State;
-    using PositionExtension for PositionExtension.State;
-    using CLPositionInfoLibrary for CLPositionInfo;
-
-    constructor(
-        ICLPoolManager _poolManager,
-        ICLPositionManager _positionManager
-    ) CLBaseHook(_poolManager) RewardTracker(_positionManager) {}
-
-    function getHooksRegistrationBitmap()
-        external
-        pure
-        virtual
-        override
-        returns (uint16)
-    {
-        return
-            _hooksRegistrationBitmapFrom(
-                Permissions({
-                    beforeInitialize: true,
-                    afterInitialize: false,
-                    beforeAddLiquidity: false,
-                    beforeRemoveLiquidity: false,
-                    afterAddLiquidity: false,
-                    afterRemoveLiquidity: false,
-                    beforeSwap: false,
-                    afterSwap: true,
-                    beforeDonate: false,
-                    afterDonate: false,
-                    beforeSwapReturnsDelta: false,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
-                })
-            );
-    }
-
-    function beforeInitialize(
-        address,
-        PoolKey calldata key,
-        uint160
-    ) external override poolManagerOnly returns (bytes4) {
-        PoolId poolId = key.toId();
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
-        _initialize(poolId, tick);
-
-        return this.beforeInitialize.selector;
-    }
-
-    function afterSwap(
-        address,
-        PoolKey calldata key,
-        ICLPoolManager.SwapParams calldata,
-        BalanceDelta,
-        bytes calldata
-    ) external override poolManagerOnly returns (bytes4, int128) {
-        PoolId poolId = key.toId();
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
-        console.log("[NoOpRewardTracker.afterSwap] tick:", tick);
-
-        _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
-
-        return (this.afterSwap.selector, 0);
-    }
-
-    function _beforeOnSubscribeTracker(
-        PoolKey memory key
-    ) internal virtual override {
-        // console.log("beforeOnSubscribeTracker");
-    }
-    function _beforeOnUnubscribeTracker(
-        PoolKey memory key
-    ) internal virtual override {
-        // console.log("beforeOnUnubscribeTracker");
-    }
-    function _beforeOnModifyLiquidityTracker(
-        PoolKey memory key
-    ) internal override {}
-
-    function _beforeOnNotifyTransferTracker(
-        PoolKey memory key
-    ) internal override {}
-
-    function donateRewards(PoolId poolId, uint128 amount) public {
-        _distributeReward(poolId, amount);
-    }
-
-    function accrueRewards(uint256 tokenId) public {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
-        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
-
-        _accrueRewards(
-            tokenId,
-            IERC721(address(positionManager)).ownerOf(tokenId),
-            liquidity,
-            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
-                positionInfo.tickLower(),
-                positionInfo.tickUpper()
-            )
-        );
-    }
-
-    function collectRewards(address to) external returns (uint256 rewards) {
-        rewards = accruedRewards[msg.sender];
-        accruedRewards[msg.sender] = 0;
-    }
-}
+import {NoOpRewardTracker} from "./contracts/NoOpRewardTracker.sol";
 
 contract RewardTrackerHookTest is Test, CLTestUtils {
     using LPFeeLibrary for uint24;
@@ -206,15 +94,6 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             address(this),
             type(uint256).max
         );
-
-        console.log("currency0: ", address(Currency.unwrap(currency0)));
-        console.log("currency1: ", address(Currency.unwrap(currency1)));
-        console.log("user1", user1);
-        // console.log("user2", user2);
-        console.log("this", address(this));
-        console.log("vault", address(vault));
-        console.log("universalRouter", address(universalRouter));
-        console.log("trackerHook", address(trackerHook));
     }
 
     function test_RewardTrackerHookTest_RewardsPerLiquidityIsZeroAfterInitialize()
@@ -455,8 +334,6 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
 
         uint256 rewards = trackerHook.accruedRewards(address(this));
 
-        console.log("rewards: ", rewards);
-
         assertGt(
             rewards,
             0,
@@ -533,7 +410,7 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
         int24 tickUpper = 60;
 
         uint256 tokenId1 = positionManager.nextTokenId();
-        console.log("before addLiquidity user1");
+
         addLiquidity(key, 1, 1, tickLower, tickUpper, user1);
         vm.startPrank(user1);
         positionManager.subscribe(tokenId1, address(trackerHook), ZERO_BYTES);
@@ -545,7 +422,6 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
         positionManager.subscribe(tokenId2, address(trackerHook), ZERO_BYTES);
         vm.stopPrank();
 
-        console.log("before donate");
         trackerHook.donateRewards(poolId, 1 ether);
 
         trackerHook.accrueRewards(tokenId1);

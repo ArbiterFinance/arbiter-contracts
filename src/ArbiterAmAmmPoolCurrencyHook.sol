@@ -33,9 +33,9 @@ import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 /// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
 /// @dev The strategy address should be able to manage ERC6909 claim tokens in the PoolManager.
 ///
-/// @notice ArbiterAmAmmSimpleHook uses currency0 or currency1 from the pool ( depending on immutable RENT_IN_TOKEN_ZERO ) as the rent currency.
+/// @notice ArbiterAmAmmPoolCurrencyHook uses currency0 or currency1 from the pool ( depending on immutable RENT_IN_TOKEN_ZERO ) as the rent currency.
 /// @notice The rent is distributed to the active tick using donate.
-contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
+contract ArbiterAmAmmPoolCurrencyHook is ArbiterAmAmmBaseHook {
     bool immutable RENT_IN_TOKEN_ZERO;
 
     using LPFeeLibrary for uint24;
@@ -63,10 +63,6 @@ contract ArbiterAmAmmSimpleHook is ArbiterAmAmmBaseHook {
         PoolKey memory key,
         uint128 rentAmount
     ) internal override {
-        console.log(
-            "[ArbiterAmAmmSimpleHook._distributeRent] rentAmount",
-            rentAmount
-        );
         vault.burn(address(this), _getPoolRentCurrency(key), rentAmount);
         poolManager.donate(key, rentAmount, 0, "");
     }
