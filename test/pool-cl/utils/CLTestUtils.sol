@@ -52,7 +52,7 @@ contract CLTestUtils is DeployPermit2 {
             vault,
             poolManager,
             permit2,
-            10000 ether,
+            100_000,
             ICLPositionDescriptor(address(0)),
             IWETH9(address(0))
         );

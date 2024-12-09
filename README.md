@@ -1,6 +1,4 @@
-# Auction Managed AMM & Active Range Incentives in Any Currency
-
-Besides inline documentation available in source code, below is a high-level overview of the project, including the key components, interfaces, and usage.
+# Arbiter am-AMM
 
 ## Auction Managed AMM implementation
 
@@ -188,18 +186,3 @@ function collectRewards(address to) external returns (uint256 rewards) {
 
 4. **Bidding and Overbidding**:  
    Users can deposit tokens and call `overbid` to become the winner. The contract updates the current winner, the rent rate, and collects rent periodically.
-
-## Tests Description
-
-The `test` directory contains suites of Foundry-based tests.
-
-- **Reward Tracking**:
-  - Ensured precise reward growth for active LPs in correct ticks.
-  - Automatic, accurate reward distribution during swaps.
-  - Successful reward collection and claim by LPs.
-- **Auction Managed AMM**:
-  - Tested bidding, overbidding, and dynamic auction winner changes.
-  - Ensured correctness of swaps’ impact on winners’ earnings and rewards.
-  - Covered non-pool token rewards with seamless LP subscription to Reward Tracking as well as pool token rewards
-  - Covered pool token rewards comprehensively
-  - Guaranteed reliable contract functionality under various flows
