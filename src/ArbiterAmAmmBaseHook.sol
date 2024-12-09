@@ -45,7 +45,7 @@ abstract contract ArbiterAmAmmBaseHook is
     using AuctionSlot0Library for AuctionSlot0;
     using AuctionSlot1Library for AuctionSlot1;
 
-    /// @notice Data passed to `PoolManager.unlock` when distributing rent to LPs.
+    /// @notice Data passed to `vault.unlock` when distributing rent to LPs.
     struct CallbackData {
         address currency;
         address sender;
@@ -160,8 +160,6 @@ abstract contract ArbiterAmAmmBaseHook is
         poolManagerOnly
         returns (bytes4, BeforeSwapDelta, uint24)
     {
-        console.log("[beforeSwap] start");
-        console.log("[beforeSwap] block.number: %d", block.number);
         PoolId poolId = key.toId();
         AuctionSlot0 slot0 = poolSlot0[poolId];
         slot0 = _changeStrategyIfNeeded(slot0, poolId);
@@ -184,45 +182,27 @@ abstract contract ArbiterAmAmmBaseHook is
                 gas: 2 << slot0.strategyGasLimit()
             }(sender, key, params, hookData)
         returns (uint24 _fee) {
-            console.log("[beforeSwap] _fee: %d", _fee);
             if (_fee <= 1e6) {
                 fee = _fee;
             }
         } catch {}
-        console.log("[beforeSwap] fee: %d", fee);
 
         int256 totalFees = (params.amountSpecified * int256(uint256(fee))) /
             1e6;
-        console.log("[beforeSwap] totalFees: %d", totalFees);
         uint256 absTotalFees = totalFees < 0
             ? uint256(-totalFees)
             : uint256(totalFees);
-        console.log("[beforeSwap] absTotalFees: %d", absTotalFees);
 
         // Calculate fee split
         uint256 strategyFee = (absTotalFees * slot0.winnerFeeSharePart()) / 1e6;
 
-        console.log("[beforeSwap] strategyFee: %d", strategyFee);
         uint256 lpFee = absTotalFees - strategyFee;
-        console.log("[beforeSwap] lpFee: %d", lpFee);
 
         // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
         bool exactOut = params.amountSpecified > 0;
 
         bool isFeeCurrency0 = exactOut == params.zeroForOne;
-
-        if (exactOut == params.zeroForOne) {
-            console.log("[beforeSwap] feeCurrency key.currency0");
-        } else {
-            console.log("[beforeSwap] feeCurrency key.currency1");
-        }
-
-        if (exactOut) {
-            console.log("[beforeSwap] exactOut");
-        } else {
-            console.log("[beforeSwap] exactIn");
-        }
 
         // Send fees to strategy
         vault.mint(
@@ -232,10 +212,8 @@ abstract contract ArbiterAmAmmBaseHook is
         );
 
         if (isFeeCurrency0) {
-            console.log("[beforeSwap] donate amount0");
             poolManager.donate(key, lpFee, 0, "");
         } else {
-            console.log("[beforeSwap] donate amount1");
             poolManager.donate(key, 0, lpFee, "");
         }
 
@@ -260,7 +238,6 @@ abstract contract ArbiterAmAmmBaseHook is
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
-            console.log("[afterSwap] tick != slot0.lastActiveTick()");
             _payRentAndChangeStrategyIfNeeded(key);
         }
 
@@ -354,7 +331,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
-        // Deposit 6909 claim tokens to Uniswap V4 PoolManager. The claim tokens are owned by this contract.
+        // Deposit 6909 claim tokens to Pancake V4 Vault. The claim tokens are owned by this contract.
         vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
         deposits[msg.sender][Currency.wrap(asset)] += amount;
 
@@ -396,15 +373,6 @@ abstract contract ArbiterAmAmmBaseHook is
                 uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
                     (uint120(slot1.rentPerBlock()) * _overbidFactor) /
                     1e6;
-                console.log(
-                    "[overbid] minimumRentPerBlock: %d",
-                    minimumRentPerBlock
-                );
-                console.log("[overbid] rentPerBlock: %d", rentPerBlock);
-                console.log(
-                    "[overbid] slot1.rentPerBlock(): %d",
-                    slot1.rentPerBlock()
-                );
                 if (uint120(rentPerBlock) <= minimumRentPerBlock) {
                     revert RentTooLow();
                 }
@@ -438,14 +406,9 @@ abstract contract ArbiterAmAmmBaseHook is
         uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
 
-        console.log("[overbid] totalRent: %d", totalRent);
-        console.log("[overbid] auctionFee: %d", auctionFee);
-        console.log("[overbid] requiredDeposit: %d", requiredDeposit);
-
         unchecked {
             uint256 availableDeposit = deposits[msg.sender][currency];
 
-            console.log("[overbid] availableDeposit: %d", availableDeposit);
             if (availableDeposit < requiredDeposit) {
                 revert InsufficientDeposit();
             }
@@ -478,7 +441,7 @@ abstract contract ArbiterAmAmmBaseHook is
             }
             deposits[msg.sender][Currency.wrap(asset)] = depositAmount - amount;
         }
-        // Withdraw 6909 claim tokens from Uniswap V4 PoolManager
+        // Withdraw 6909 claim tokens from vault
         vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
 
         emit Withdraw(msg.sender, asset, amount);
@@ -511,6 +474,7 @@ abstract contract ArbiterAmAmmBaseHook is
         bytes calldata rawData
     ) external override vaultOnly returns (bytes memory) {
         CallbackData memory data = abi.decode(rawData, (CallbackData));
+        Currency currencyWrapped = Currency.wrap(data.currency);
 
         if (data.depositAmount > 0) {
             vault.sync(Currency.wrap(data.currency));
@@ -520,24 +484,12 @@ abstract contract ArbiterAmAmmBaseHook is
                 address(vault),
                 data.depositAmount
             );
-            vault.mint(
-                address(this),
-                Currency.wrap(data.currency),
-                data.depositAmount
-            );
+            vault.mint(address(this), currencyWrapped, data.depositAmount);
             vault.settle();
         }
         if (data.withdrawAmount > 0) {
-            vault.burn(
-                address(this),
-                Currency.wrap(data.currency),
-                data.withdrawAmount
-            );
-            vault.mint(
-                data.sender,
-                Currency.wrap(data.currency),
-                data.withdrawAmount
-            );
+            vault.burn(address(this), currencyWrapped, data.withdrawAmount);
+            vault.mint(data.sender, currencyWrapped, data.withdrawAmount);
             vault.settle();
         }
 
@@ -554,7 +506,6 @@ abstract contract ArbiterAmAmmBaseHook is
     ) internal view returns (AuctionSlot0) {
         // check if we need to change strategy
         if (slot0.shouldChangeStrategy()) {
-            console.log("[_changeStrategyIfNeeded] shouldChangeStrategy");
             slot0 = slot0
                 .setStrategyAddress(winnerStrategies[poolId])
                 .setShouldChangeStrategy(false);
@@ -570,29 +521,11 @@ abstract contract ArbiterAmAmmBaseHook is
         uint32 lastPaidBlock = slot1.lastPaidBlock();
         uint128 remainingRent = slot1.remainingRent();
 
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] lastPaidBlock: %d",
-            lastPaidBlock
-        );
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] remainingRent: %d",
-            remainingRent
-        );
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] block.number: %d",
-            block.number
-        );
         if (lastPaidBlock == uint32(block.number)) {
-            console.log(
-                "[_payRentAndChangeStrategyIfNeeded] lastPaidBlock == block.number"
-            );
             return;
         }
 
         if (remainingRent == 0) {
-            console.log(
-                "[_payRentAndChangeStrategyIfNeeded] remainingRent == 0"
-            );
             slot1 = slot1.setLastPaidBlock(uint32(block.number));
             poolSlot1[poolId] = slot1;
             return;
@@ -605,21 +538,8 @@ abstract contract ArbiterAmAmmBaseHook is
             blocksElapsed = uint32(block.number) - lastPaidBlock;
         }
 
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] blocksElapsed: %d",
-            blocksElapsed
-        );
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] rentPerBlock: %d",
-            slot1.rentPerBlock()
-        );
-
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
-        console.log(
-            "[_payRentAndChangeStrategyIfNeeded] rentAmount: %d",
-            rentAmount
-        );
         if (rentAmount > remainingRent) {
             // pay the remainingRent and reset the auction - no winner
             rentAmount = remainingRent;

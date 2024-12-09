@@ -38,10 +38,10 @@ import {RewardTracker} from "./RewardTracker.sol";
 /// @dev The strategy address should implement IArbiterFeeProvider to set the trading fees.
 /// @dev The strategy address should be able to manage ERC6909 claim tokens in the PoolManager.
 ///
-/// @notice ArbiterAmAmmERC20Hook uses immutable rentCurrency as the rent currency for all trading pairs.
+/// @notice ArbiterAmAmmAnyERC20Hook uses immutable rentCurrency as the rent currency for all trading pairs.
 /// @notice To recieve rent, Liquididty Providers must subscribe to this contract.
 /// @notice To claim the rewards one must call collectRewards.
-contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
+contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     using LPFeeLibrary for uint24;
     using CurrencyLibrary for Currency;
     using CLPoolGetters for CLPool.State;
@@ -103,7 +103,11 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
             _payRentAndChangeStrategyIfNeeded(key);
-            _changeActiveTick(poolId, tick, key.parameters.getTickSpacing());
+            _handleActiveTickChange(
+                poolId,
+                tick,
+                key.parameters.getTickSpacing()
+            );
         }
 
         return (this.afterSwap.selector, 0);
@@ -144,9 +148,7 @@ contract ArbiterAmAmmERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         _payRentAndChangeStrategyIfNeeded(key);
     }
 
-    function _beforeOnNotifyTransferTracker(
-        PoolKey memory key
-    ) internal override {
+    function _beforeOnTransferTracker(PoolKey memory key) internal override {
         _payRentAndChangeStrategyIfNeeded(key);
     }
 
