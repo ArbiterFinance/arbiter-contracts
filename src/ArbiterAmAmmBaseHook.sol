@@ -396,6 +396,15 @@ abstract contract ArbiterAmAmmBaseHook is
                 uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
                     (uint120(slot1.rentPerBlock()) * _overbidFactor) /
                     1e6;
+                console.log(
+                    "[overbid] minimumRentPerBlock: %d",
+                    minimumRentPerBlock
+                );
+                console.log("[overbid] rentPerBlock: %d", rentPerBlock);
+                console.log(
+                    "[overbid] slot1.rentPerBlock(): %d",
+                    slot1.rentPerBlock()
+                );
                 if (uint120(rentPerBlock) <= minimumRentPerBlock) {
                     revert RentTooLow();
                 }
@@ -490,7 +499,7 @@ abstract contract ArbiterAmAmmBaseHook is
         winnerStrategies[poolId] = strategy;
         poolSlot0[poolId].setShouldChangeStrategy(true);
 
-        emit ChangeStrategy(msg.sender, poolId, strategy);
+        emit ChangeStrategy(poolId, strategy);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
