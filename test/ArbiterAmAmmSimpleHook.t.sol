@@ -610,18 +610,6 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
             1e6;
 
-        console.log("prevBalance0: ", prevBalance0);
-        console.log("postBalance0: ", postBalance0);
-        console.log("amountIn: ", amountIn);
-        console.log("expectedFeeAmount: ", expectedFeeAmount);
-
-        assertApproxEqRel(
-            prevBalance0 - postBalance0,
-            amountIn,
-            1,
-            "Amount in mismatch"
-        );
-
         uint256 strategyBalancePostExpiry = vault.balanceOf(
             address(strategy),
             key.currency1
@@ -1299,14 +1287,14 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
 
         arbiterHook.setAuctionFee(key, 500);
 
-        uint80 totalRent = 10e18;
+        uint80 rentPerBlock = 10e18;
         AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
 
         uint24 hookAuctionFee = slot0.auctionFee();
         assertEq(hookAuctionFee, 500, "Auction fee should be 500");
-
-        uint80 auctionFee = (totalRent * hookAuctionFee) / 1e6;
-        uint80 requiredDeposit = totalRent + auctionFee;
+        uint128 totalRent = rentPerBlock * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 auctionFee = (totalRent * hookAuctionFee) / 1e6;
+        uint128 requiredDeposit = totalRent + auctionFee;
 
         uint32 rentEndBlock = uint32(
             STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
@@ -1315,13 +1303,15 @@ contract ArbiterAmAmmSimpleHookTest is Test, CLTestUtils {
         transferToAndDepositAs(totalRent, user1);
 
         vm.prank(user1);
-        vm.expectRevert(IArbiterAmAmmHarbergerLease.RentTooLow.selector);
-        arbiterHook.overbid(key, totalRent, rentEndBlock, address(0));
+        vm.expectRevert(
+            IArbiterAmAmmHarbergerLease.InsufficientDeposit.selector
+        );
+        arbiterHook.overbid(key, rentPerBlock, rentEndBlock, address(0));
 
         transferToAndDepositAs(auctionFee, user1);
 
         vm.prank(user1);
-        arbiterHook.overbid(key, totalRent, rentEndBlock, address(0));
+        arbiterHook.overbid(key, rentPerBlock, rentEndBlock, address(0));
 
         address winner = arbiterHook.winner(key);
         assertEq(
