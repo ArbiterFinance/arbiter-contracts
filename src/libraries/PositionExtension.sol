@@ -3,15 +3,11 @@ pragma solidity ^0.8.26;
 
 import {FullMath} from "pancake-v4-core/src/pool-cl/libraries/FullMath.sol";
 import {FixedPoint128} from "pancake-v4-core/src/pool-cl/libraries/FixedPoint128.sol";
-import {LiquidityMath} from "pancake-v4-core/src/pool-cl/libraries/LiquidityMath.sol";
-import {CustomRevert} from "pancake-v4-core/src/libraries/CustomRevert.sol";
 
 /// @title PositionExtension
 /// @notice Positions represent an owner address' liquidity between a lower and upper tick boundary
 /// @dev Positions store additional state for tracking fees owed to the position
 library PositionExtension {
-    using CustomRevert for bytes4;
-
     /// @notice Cannot update a position with no liquidity
     error CannotUpdateEmptyPosition();
 

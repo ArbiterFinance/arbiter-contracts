@@ -3,18 +3,9 @@ pragma solidity ^0.8.0;
 
 import {SafeCast} from "pancake-v4-core/src/libraries/SafeCast.sol";
 import {TickBitmap} from "pancake-v4-core/src/pool-cl/libraries/TickBitmap.sol";
-import {CLPosition} from "pancake-v4-core/src/pool-cl/libraries/CLPosition.sol";
-import {UnsafeMath} from "pancake-v4-core/src/libraries/math/UnsafeMath.sol";
-import {FixedPoint128} from "pancake-v4-core/src/pool-cl/libraries/FixedPoint128.sol";
-import {TickMath} from "pancake-v4-core/src/pool-cl/libraries/TickMath.sol";
-import {SqrtPriceMath} from "pancake-v4-core/src/pool-cl/libraries/SqrtPriceMath.sol";
-import {SwapMath} from "pancake-v4-core/src/pool-cl/libraries/SwapMath.sol";
-import {BalanceDelta, toBalanceDelta, BalanceDeltaLibrary} from "pancake-v4-core/src/types/BalanceDelta.sol";
 import {ProtocolFeeLibrary} from "pancake-v4-core/src/libraries/ProtocolFeeLibrary.sol";
 import {LiquidityMath} from "pancake-v4-core/src/pool-cl/libraries/LiquidityMath.sol";
 import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {CustomRevert} from "pancake-v4-core/src/libraries/CustomRevert.sol";
-import {console} from "forge-std/console.sol";
 
 /// @notice a library that records staked/subscribed liquiduty and allows for the calculation of
 ///         the rewards per liquidity of a position

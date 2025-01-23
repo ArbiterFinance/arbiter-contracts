@@ -1,30 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {BalanceDelta, toBalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta, toBeforeSwapDelta} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
-import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
-import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
+import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
+import {Currency} from "pancake-v4-core/src/types/Currency.sol";
 import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
+import {PoolId} from "pancake-v4-core/src/types/PoolId.sol";
 import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {TickMath} from "pancake-v4-core/src/pool-cl/libraries/TickMath.sol";
-
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IERC20Minimal} from "pancake-v4-core/src/interfaces/IERC20Minimal.sol";
 import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
-import {ILockCallback} from "pancake-v4-core/src/interfaces/ILockCallback.sol";
-import {console} from "forge-std/console.sol";
-
-import {AuctionSlot0, AuctionSlot0Library} from "./types/AuctionSlot0.sol";
-import {AuctionSlot1, AuctionSlot1Library} from "./types/AuctionSlot1.sol";
-
-import {IArbiterAmAmmHarbergerLease} from "./interfaces/IArbiterAmAmmHarbergerLease.sol";
-import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
