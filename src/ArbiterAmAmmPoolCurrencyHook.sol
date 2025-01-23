@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import {BalanceDelta, toBalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {CLBaseHook} from "./pool-cl/CLBaseHook.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
 import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";

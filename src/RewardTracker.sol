@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import "./libraries/PoolExtension.sol";
-import {CLBaseHook} from "./pool-cl/CLBaseHook.sol";
 
 import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
 import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
