@@ -141,7 +141,17 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         vault.lock(
             abi.encode(
-                CallbackData(Currency.unwrap(rentCurrency), to, 0, rewards)
+                CallbackData(
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            Currency.unwrap(rentCurrency),
+                            to,
+                            0,
+                            rewards
+                        )
+                    )
+                )
             )
         );
     }

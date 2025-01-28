@@ -38,12 +38,25 @@ abstract contract ArbiterAmAmmBaseHook is
     using AuctionSlot0Library for AuctionSlot0;
     using AuctionSlot1Library for AuctionSlot1;
 
+    enum CallbackAction {
+        DEPOSIT_OR_WITHDRAW,
+        PAY_RENT_AND_CHANGE_STRATEGY
+    }
     /// @notice Data passed to `vault.unlock` when distributing rent to LPs.
-    struct CallbackData {
+    struct DepositOrWithdrawCallbackPayload {
         address currency;
         address sender;
         uint256 depositAmount;
         uint256 withdrawAmount;
+    }
+
+    struct PayRentAndChangeStrategyCallbackPayload {
+        PoolKey key;
+    }
+
+    struct CallbackData {
+        CallbackAction action;
+        bytes data;
     }
 
     uint32 internal _transitionBlocks = 30;
@@ -325,7 +338,21 @@ abstract contract ArbiterAmAmmBaseHook is
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
         // Deposit 6909 claim tokens to Pancake V4 Vault. The claim tokens are owned by this contract.
-        vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            asset,
+                            msg.sender,
+                            amount,
+                            0
+                        )
+                    )
+                )
+            )
+        );
         deposits[msg.sender][Currency.wrap(asset)] += amount;
 
         emit Deposit(msg.sender, asset, amount);
@@ -372,7 +399,14 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        _payRentAndChangeStrategyIfNeeded(key);
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
+                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
+                )
+            )
+        );
 
         Currency currency = _getPoolRentCurrency(key);
 
@@ -439,7 +473,21 @@ abstract contract ArbiterAmAmmBaseHook is
             deposits[msg.sender][Currency.wrap(asset)] = depositAmount - amount;
         }
         // Withdraw 6909 claim tokens from vault
-        vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            asset,
+                            msg.sender,
+                            0,
+                            amount
+                        )
+                    )
+                )
+            )
+        );
 
         emit Withdraw(msg.sender, asset, amount);
     }
@@ -470,27 +518,40 @@ abstract contract ArbiterAmAmmBaseHook is
     function lockAcquired(
         bytes calldata rawData
     ) external override vaultOnly returns (bytes memory) {
-        CallbackData memory data = abi.decode(rawData, (CallbackData));
-        Currency currencyWrapped = Currency.wrap(data.currency);
+        CallbackData memory cbData = abi.decode(rawData, (CallbackData));
 
-        if (data.depositAmount > 0) {
-            vault.sync(Currency.wrap(data.currency));
-            // Transfer tokens directly from msg.sender to the vault
-            IERC20(data.currency).transferFrom(
-                data.sender,
-                address(vault),
-                data.depositAmount
+        if (cbData.action == CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY) {
+            PayRentAndChangeStrategyCallbackPayload memory data = abi.decode(
+                cbData.data,
+                (PayRentAndChangeStrategyCallbackPayload)
             );
-            vault.mint(address(this), currencyWrapped, data.depositAmount);
-            vault.settle();
-        }
-        if (data.withdrawAmount > 0) {
-            vault.burn(address(this), currencyWrapped, data.withdrawAmount);
-            vault.mint(data.sender, currencyWrapped, data.withdrawAmount);
-            vault.settle();
-        }
+            _payRentAndChangeStrategyIfNeeded(data.key);
+        } else {
+            DepositOrWithdrawCallbackPayload memory data = abi.decode(
+                cbData.data,
+                (DepositOrWithdrawCallbackPayload)
+            );
+            Currency currencyWrapped = Currency.wrap(data.currency);
 
-        return "";
+            if (data.depositAmount > 0) {
+                vault.sync(Currency.wrap(data.currency));
+                // Transfer tokens directly from msg.sender to the vault
+                IERC20(data.currency).transferFrom(
+                    data.sender,
+                    address(vault),
+                    data.depositAmount
+                );
+                vault.mint(address(this), currencyWrapped, data.depositAmount);
+                vault.settle();
+            }
+            if (data.withdrawAmount > 0) {
+                vault.burn(address(this), currencyWrapped, data.withdrawAmount);
+                vault.mint(data.sender, currencyWrapped, data.withdrawAmount);
+                vault.settle();
+            }
+
+            return "";
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -626,14 +687,18 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolId poolId = key.toId();
         uint128 collectedFee = auctionFees[poolId].collectedFee;
         auctionFees[poolId].collectedFee = 0;
-
         vault.lock(
             abi.encode(
                 CallbackData(
-                    Currency.unwrap(_getPoolRentCurrency(key)),
-                    to,
-                    0,
-                    collectedFee
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            Currency.unwrap(_getPoolRentCurrency(key)),
+                            to,
+                            0,
+                            collectedFee
+                        )
+                    )
                 )
             )
         );

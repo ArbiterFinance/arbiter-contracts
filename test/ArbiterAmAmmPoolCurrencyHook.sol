@@ -1741,4 +1741,171 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             "User1 should end up with at least their initial balance (including refunds)"
         );
     }
+
+    function test_ArbiterAmAmmPoolCurrencyHook_CollectFeeAcrossSwaps() public {
+        // Scenario:
+        // 1. Set an auction fee.
+        // 2. User1 deposits and overbids, becoming the winner.
+        // 3. After 10 blocks, perform a swap -> User1 pays rent for 10 blocks, User1 strategy collects fees.
+        // 4. User2 deposits and overbids with a higher rent in a new block, becoming the new winner.
+        //    Upon takeover, User1 gets refunded remaining rent + a portion of the previously locked fee (feeRefund).
+        // 5. After another 10 blocks, perform a second swap -> User2 pays rent for 10 blocks, User2 strategy collects fees.
+        // 6. User1, who is no longer the winner, can now withdraw their remaining deposit, including refunded rent and fee portion.
+        // 7. Verify protocol fee distribution and that User1 ends up with the correct refunded amounts.
+
+        resetCurrentBlock();
+
+        // Set auction fee to 500 (0.05%)
+        arbiterHook.setAuctionFee(key, 500);
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        // Define rents and strategies
+        uint24 feeUser1 = 1000; // 0.1%
+        uint24 feeUser2 = 2000; // 0.2%
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        // User1 scenario
+        uint80 user1RentPerBlock = 10e18;
+        uint128 user1TotalRent = user1RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
+        uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
+        uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+        transferToAndDepositAs(user1Deposit, user1);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1RentPerBlock,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint128 remainingRentAfterSwapUser1 = arbiterHook
+            .poolSlot1(id)
+            .remainingRent();
+
+        assertEq(
+            remainingRentAfterSwapUser1,
+            user1TotalRent - 10 * user1RentPerBlock,
+            "Remaining rent should be less than user1's total rent after first swap"
+        );
+
+        uint256 feeAmountUser1 = (amountIn * feeUser1) / 1e6;
+        uint256 expectedFeeAmountUser1 = (feeAmountUser1 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+        uint256 strategyUser1Balance = vault.balanceOf(
+            address(strategyUser1),
+            key.currency0
+        );
+        assertEq(
+            strategyUser1Balance,
+            expectedFeeAmountUser1,
+            "Strategy user1 did not receive correct fees after first swap"
+        );
+
+        uint80 user2RentPerBlock = 20e18;
+        uint128 user2TotalRent = user2RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
+        uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
+        uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
+
+        uint32 rentEndBlock2 = uint32(
+            STARTING_BLOCK + 10 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(user2Deposit, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2RentPerBlock,
+            rentEndBlock2,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
+        uint128 remainingRentAfterUser2Overbid = slot1.remainingRent();
+
+        address currentWinner = arbiterHook.winner(key);
+        assertEq(currentWinner, user2, "User2 should be the new winner");
+
+        (
+            uint128 initialRemainingRent,
+            uint128 feeLocked,
+            uint128 collectedFee
+        ) = arbiterHook.auctionFees(id);
+        assertEq(
+            feeLocked,
+            user2AuctionFee,
+            "Auction fee should be collected for user2"
+        );
+
+        assertEq(
+            initialRemainingRent,
+            user2TotalRent,
+            "Initial remaining rent should be equal to user2's total rent"
+        );
+
+        uint128 feeRefund = uint128(
+            (uint256(user1AuctionFee) * remainingRentAfterSwapUser1) /
+                user1TotalRent
+        );
+
+        assertEq(
+            collectedFee,
+            user1AuctionFee - feeRefund,
+            "Collected fee should be greater than zero after user2 overbid - user1 fee refund but part of it got captured"
+        );
+        moveBlockBy(100);
+
+        transferToAndDepositAs(user2Deposit * 1000000, user1);
+        uint32 rentEndBlock3 = uint32(
+            STARTING_BLOCK + 10 + 100 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user2RentPerBlock * 100,
+            rentEndBlock3,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        (
+            uint128 initialRemainingRent2,
+            uint128 feeLocked2,
+            uint128 collectedFee2
+        ) = arbiterHook.auctionFees(id);
+
+        assertEq(
+            collectedFee,
+            collectedFee2,
+            "Collected fee should be the same after user1 overbid"
+        );
+    }
 }
