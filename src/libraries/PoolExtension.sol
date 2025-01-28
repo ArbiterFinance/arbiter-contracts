@@ -92,6 +92,8 @@ library PoolExtension {
         State storage self,
         uint128 rewardsAmount
     ) internal {
+        if (self.liquidity == 0) return;
+
         self.rewardsPerLiquidityCumulativeX128 +=
             (uint256(rewardsAmount) << 128) /
             self.liquidity;
