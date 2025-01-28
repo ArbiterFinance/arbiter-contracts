@@ -390,7 +390,11 @@ abstract contract ArbiterAmAmmBaseHook is
             deposits[winners[poolId]][currency] +=
                 slot1.remainingRent() +
                 feeRefund;
-            auctionFees[poolId] = AuctionFee(0, 0, collectedFee);
+            auctionFees[poolId] = AuctionFee(
+                0,
+                0,
+                auctionFees[poolId].collectedFee + collectedFee
+            );
         }
 
         // charge the new winner
