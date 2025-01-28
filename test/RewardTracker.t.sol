@@ -190,9 +190,15 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
         uint256 rewardsPerLiquidityInsideX128Before = trackerHook
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
 
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
         (, int24 tick, , ) = poolManager.getSlot0(key.toId());
 
         assertEq(tick, 5, "Tick should be 5");
+        assertEq(
+            tickFromRewardTracker,
+            tick,
+            "Tick from reward tracker should be equal to the pool tick"
+        );
 
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
@@ -204,9 +210,15 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             })
         );
 
+        (, , int24 tickFromRewardTracker2) = trackerHook.pools(poolId);
         (, int24 tick2, , ) = poolManager.getSlot0(key.toId());
 
         assertGt(tick2, 5, "Tick should be greater than 5");
+        assertEq(
+            tickFromRewardTracker2,
+            tick2,
+            "Tick from reward tracker should be equal to the pool tick 2"
+        );
 
         uint256 rewardsPerLiquidityInsideX128After = trackerHook
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
@@ -227,9 +239,15 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             })
         );
 
+        (, , int24 tickFromRewardTracker3) = trackerHook.pools(poolId);
         (, int24 tick3, , ) = poolManager.getSlot0(key.toId());
 
         assertGt(tick3, tick2, "Tick should be greater than previous tick");
+        assertEq(
+            tickFromRewardTracker3,
+            tick3,
+            "Tick from reward tracker should be equal to the pool tick 3"
+        );
 
         uint256 rewardsPerLiquidityInsideX128After2 = trackerHook
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
@@ -250,12 +268,18 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             })
         );
 
+        (, , int24 tickFromRewardTracker4) = trackerHook.pools(poolId);
         (, int24 tick4, , ) = poolManager.getSlot0(key.toId());
 
         assertLt(
             tick4,
             tick3,
             "Tick should be lesser than previous tick (going left this time)"
+        );
+        assertEq(
+            tickFromRewardTracker4,
+            tick4,
+            "Tick from reward tracker should be equal to the pool tick 4"
         );
 
         assertGt(tick4, tick, "Tick should be greater than initial tick");

@@ -400,7 +400,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             abi.encodeWithSelector(
                 CustomRevert.WrappedError.selector,
                 address(arbiterHook),
-                ICLHooks.beforeInitialize.selector,
+                ICLHooks.afterInitialize.selector,
                 abi.encodeWithSelector(
                     IArbiterAmAmmHarbergerLease.NotDynamicFee.selector
                 ),

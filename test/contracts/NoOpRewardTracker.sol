@@ -58,8 +58,8 @@ contract NoOpRewardTracker is CLBaseHook, RewardTracker {
         return
             _hooksRegistrationBitmapFrom(
                 Permissions({
-                    beforeInitialize: true,
-                    afterInitialize: false,
+                    beforeInitialize: false,
+                    afterInitialize: true,
                     beforeAddLiquidity: false,
                     beforeRemoveLiquidity: false,
                     afterAddLiquidity: false,
@@ -76,16 +76,16 @@ contract NoOpRewardTracker is CLBaseHook, RewardTracker {
             );
     }
 
-    function beforeInitialize(
+    function afterInitialize(
         address,
         PoolKey calldata key,
-        uint160
+        uint160,
+        int24 tick
     ) external override poolManagerOnly returns (bytes4) {
         PoolId poolId = key.toId();
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
         _initialize(poolId, tick);
 
-        return this.beforeInitialize.selector;
+        return this.afterInitialize.selector;
     }
 
     function afterSwap(

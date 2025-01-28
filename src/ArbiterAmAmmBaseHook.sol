@@ -100,8 +100,8 @@ abstract contract ArbiterAmAmmBaseHook is
         return
             _hooksRegistrationBitmapFrom(
                 Permissions({
-                    beforeInitialize: true,
-                    afterInitialize: false,
+                    beforeInitialize: false,
+                    afterInitialize: true,
                     beforeAddLiquidity: true,
                     beforeRemoveLiquidity: false,
                     afterAddLiquidity: false,
@@ -119,16 +119,15 @@ abstract contract ArbiterAmAmmBaseHook is
     }
 
     /// @dev Reverts if dynamic fee flag is not set or if the pool is not initialized with dynamic fees.
-    function beforeInitialize(
+    function afterInitialize(
         address,
         PoolKey calldata key,
-        uint160
+        uint160,
+        int24 tick
     ) external virtual override poolManagerOnly returns (bytes4) {
         // Pool must have dynamic fee flag set. This is so we can override the LP fee in `beforeSwap`.
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
         PoolId poolId = key.toId();
-
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
 
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
@@ -138,7 +137,7 @@ abstract contract ArbiterAmAmmBaseHook is
             .setAuctionFee(_defaultAuctionFee)
             .setLastActiveTick(tick);
 
-        return this.beforeInitialize.selector;
+        return this.afterInitialize.selector;
     }
 
     /// @notice Distributes rent to LPs before each liquidity change.
