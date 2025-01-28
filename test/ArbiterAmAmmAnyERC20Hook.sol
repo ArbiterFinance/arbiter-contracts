@@ -556,7 +556,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -639,7 +639,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,

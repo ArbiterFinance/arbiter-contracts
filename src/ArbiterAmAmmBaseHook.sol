@@ -195,7 +195,7 @@ abstract contract ArbiterAmAmmBaseHook is
         // If amountSpecified > 0, the swap is exact-out and it's the bought token.
         bool exactOut = params.amountSpecified > 0;
 
-        bool isFeeCurrency0 = exactOut == params.zeroForOne;
+        bool isFeeCurrency0 = !exactOut == params.zeroForOne;
 
         // Send fees to strategy
         vault.mint(
@@ -213,8 +213,8 @@ abstract contract ArbiterAmAmmBaseHook is
         return (
             this.beforeSwap.selector,
             exactOut
-                ? toBeforeSwapDelta(0, int128(totalFees))
-                : toBeforeSwapDelta(0, -int128(totalFees)),
+                ? toBeforeSwapDelta(int128(totalFees), 0)
+                : toBeforeSwapDelta(-int128(totalFees), 0),
             LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
     }

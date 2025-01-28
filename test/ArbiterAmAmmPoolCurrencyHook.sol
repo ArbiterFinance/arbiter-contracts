@@ -243,7 +243,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -300,7 +300,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -507,7 +507,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(currentStrategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -577,7 +577,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
 
         assertGt(
@@ -608,7 +608,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalancePostExpiry = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalancePostExpiry,
@@ -1009,7 +1009,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         // Assert
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -1212,7 +1212,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -1248,7 +1248,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
@@ -1258,7 +1258,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser1BalanceAfter = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1BalanceAfter,
@@ -1371,7 +1371,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
@@ -1512,7 +1512,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
@@ -1629,7 +1629,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -1708,7 +1708,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
