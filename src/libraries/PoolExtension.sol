@@ -154,47 +154,70 @@ library PoolExtension {
         }
     }
 
-    function crossToActiveTick(
+    function crossToTargetTick(
         State storage self,
         int24 tickSpacing,
-        int24 activeTick
+        int24 targetTick
     ) internal {
         // initialize to the current tick
         int24 currentTick = self.tick;
         // initialize to the current liquidity
         int128 liquidityChange = 0;
 
-        //eq to zeroForOne
-        bool goingLeft = activeTick <= currentTick;
+        bool goingLeft = targetTick <= currentTick;
 
-        while ((activeTick < currentTick) == goingLeft) {
-            (int24 nextTick, ) = self
-                .tickBitmap
-                .nextInitializedTickWithinOneWord(
+        if (goingLeft) {
+            while (targetTick < currentTick) {
+                (int24 nextTick, ) = self
+                    .tickBitmap
+                    .nextInitializedTickWithinOneWord(
+                        currentTick,
+                        tickSpacing,
+                        goingLeft
+                    );
+
+                if (nextTick < targetTick) {
+                    nextTick = targetTick;
+                }
+
+                // we cross through the currentTick to the nextTick (nextTick is not crossed)
+                if (nextTick < currentTick) {
+                    int128 liquidityNet = -PoolExtension.crossTick(
+                        self,
+                        currentTick,
+                        self.rewardsPerLiquidityCumulativeX128
+                    );
+                    liquidityChange += liquidityNet;
+                    currentTick = nextTick;
+                }
+            }
+        } else {
+            // going right
+            while (currentTick < targetTick) {
+                (int24 nextTick, ) = self
+                    .tickBitmap
+                    .nextInitializedTickWithinOneWord(
+                        currentTick,
+                        tickSpacing,
+                        goingLeft
+                    );
+
+                if (nextTick > targetTick) {
+                    nextTick = targetTick;
+                }
+
+                // we cross the nextTick
+                int128 liquidityNet = -PoolExtension.crossTick(
+                    self,
                     currentTick,
-                    tickSpacing,
-                    goingLeft
+                    self.rewardsPerLiquidityCumulativeX128
                 );
-
-            int128 liquidityNet = PoolExtension.crossTick(
-                self,
-                currentTick,
-                self.rewardsPerLiquidityCumulativeX128
-            );
-
-            // if we're moving leftward, we interpret liquidityNet as the opposite sign
-            // safe because liquidityNet cannot be type(int128).min
-            unchecked {
-                if (goingLeft) liquidityNet = -liquidityNet;
+                liquidityChange += liquidityNet;
+                currentTick = nextTick;
             }
-
-            unchecked {
-                currentTick = goingLeft ? nextTick - 1 : nextTick;
-            }
-            liquidityChange += liquidityNet;
         }
 
-        self.tick = activeTick;
+        self.tick = targetTick;
 
         self.liquidity = LiquidityMath.addDelta(
             self.liquidity,
