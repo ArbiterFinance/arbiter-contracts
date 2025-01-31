@@ -61,7 +61,7 @@ abstract contract RewardTracker is IRewardTracker {
         int24 newActiveTick,
         int24 tickSpacing
     ) internal {
-        pools[id].crossToActiveTick(tickSpacing, newActiveTick);
+        pools[id].crossToTargetTick(tickSpacing, newActiveTick);
     }
 
     /// @notice collects the accrued rewards for the caller
