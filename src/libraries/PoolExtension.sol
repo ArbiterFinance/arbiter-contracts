@@ -146,7 +146,7 @@ library PoolExtension {
         }
 
         // update the active liquidity
-        if (params.tickLower < self.tick && self.tick < params.tickUpper) {
+        if (params.tickLower <= self.tick && self.tick < params.tickUpper) {
             self.liquidity = LiquidityMath.addDelta(
                 self.liquidity,
                 liquidityDelta
