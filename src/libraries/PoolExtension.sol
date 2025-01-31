@@ -47,12 +47,12 @@ library PoolExtension {
             if (self.tick < tickLower) {
                 return
                     self.ticks[tickLower].rewardsPerLiquidityOutsideX128 -
-                    self.rewardsPerLiquidityCumulativeX128;
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128;
             }
             if (self.tick >= tickUpper) {
                 return
-                    self.rewardsPerLiquidityCumulativeX128 -
-                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128;
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128 -
+                    self.ticks[tickLower].rewardsPerLiquidityOutsideX128;
             }
             return
                 self.rewardsPerLiquidityCumulativeX128 -
@@ -164,16 +164,16 @@ library PoolExtension {
         // initialize to the current liquidity
         int128 liquidityChange = 0;
 
-        bool goingLeft = targetTick <= currentTick;
+        bool lte = targetTick <= currentTick;
 
-        if (goingLeft) {
+        if (lte) {
             while (targetTick < currentTick) {
                 (int24 nextTick, ) = self
                     .tickBitmap
                     .nextInitializedTickWithinOneWord(
-                        currentTick,
+                        currentTick - 1,
                         tickSpacing,
-                        goingLeft
+                        lte
                     );
 
                 if (nextTick < targetTick) {
@@ -199,7 +199,7 @@ library PoolExtension {
                     .nextInitializedTickWithinOneWord(
                         currentTick,
                         tickSpacing,
-                        goingLeft
+                        lte
                     );
 
                 if (nextTick > targetTick) {
@@ -207,7 +207,7 @@ library PoolExtension {
                 }
 
                 // we cross the nextTick
-                int128 liquidityNet = -PoolExtension.crossTick(
+                int128 liquidityNet = PoolExtension.crossTick(
                     self,
                     currentTick,
                     self.rewardsPerLiquidityCumulativeX128
