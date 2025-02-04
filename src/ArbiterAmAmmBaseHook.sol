@@ -374,19 +374,33 @@ abstract contract ArbiterAmAmmBaseHook is
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
         unchecked {
+            // minimumEndBlock can overflow
             uint32 minimumEndBlock = uint32(block.number) + _minRentBlocks;
-            require(
-                rentEndBlock >= minimumEndBlock ||
-                    rentEndBlock < uint32(block.number),
-                RentTooShort()
-            );
+            // if minimumEndBlock does not overflow,
+            if (minimumEndBlock > uint32(block.number)) {
+                require(
+                    rentEndBlock >= minimumEndBlock ||
+                        rentEndBlock < uint32(block.number),
+                    RentTooShort()
+                );
+            }
+            // minimumEndBlock overflowed
+            else {
+                require(
+                    rentEndBlock >= minimumEndBlock &&
+                        rentEndBlock < uint32(block.number),
+                    RentTooShort()
+                );
+            }
         }
 
-        uint64 _currentRentEndBlock = slot1.rentEndBlock();
+        uint256 _currentRentEndBlock = slot1.rentEndBlock();
 
         unchecked {
+            /// If we are not in the transition period, the rentPerBlock must be higher than the previous rentPerBlock
             if (
-                uint256(uint32(block.number)) + _transitionBlocks <
+                // using uint256 to avoid overflow
+                uint256(uint32(block.number)) + uint256(_transitionBlocks) <
                 _currentRentEndBlock
             ) {
                 uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
@@ -431,7 +445,10 @@ abstract contract ArbiterAmAmmBaseHook is
         }
 
         // charge the new winner
-        uint64 rentBlockLength = rentEndBlock - uint64(block.number);
+        uint32 rentBlockLength;
+        unchecked {
+            rentBlockLength = rentEndBlock - uint32(block.number);
+        }
         uint128 totalRent = rentPerBlock * rentBlockLength;
         uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
