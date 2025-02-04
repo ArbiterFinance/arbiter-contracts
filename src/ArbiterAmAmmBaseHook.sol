@@ -656,6 +656,7 @@ abstract contract ArbiterAmAmmBaseHook is
     }
 
     function setMinRentBlocks(uint32 minRentBlocks_) external onlyOwner {
+        require(minRentBlocks_ > 0, "minRentBlock == 0");
         _minRentBlocks = minRentBlocks_;
     }
 
