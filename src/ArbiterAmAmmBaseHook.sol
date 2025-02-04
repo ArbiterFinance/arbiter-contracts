@@ -597,7 +597,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
-        if (rentAmount > remainingRent) {
+        if (rentAmount >= remainingRent) {
             // pay the remainingRent and reset the auction - no winner
             rentAmount = remainingRent;
             winners[poolId] = address(0);
