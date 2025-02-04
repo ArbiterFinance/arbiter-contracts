@@ -499,6 +499,7 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolId poolId = key.toId();
         if (
             msg.sender != winners[poolId] ||
+            msg.sender == address(0) ||
             poolSlot1[key.toId()].remainingRent() == 0
         ) {
             revert CallerNotWinner();
