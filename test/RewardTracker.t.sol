@@ -62,6 +62,9 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
     address user2 = address(0x2222222222222222222222222222222222222222);
 
     function setUp() public {
+        _setUp(Constants.SQRT_RATIO_1_1);
+    }
+    function _setUp(uint160 sqrtPriceX96) public {
         (currency0, currency1) = deployContractsWithTokens();
 
         // Deploy the solo tracker hook with required parameters
@@ -82,8 +85,7 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
         });
         poolId = key.toId();
 
-        // Initialize the pool with a price of 1:1
-        poolManager.initialize(key, Constants.SQRT_RATIO_1_1);
+        poolManager.initialize(key, sqrtPriceX96);
 
         MockERC20(Currency.unwrap(currency0)).mint(
             address(this),
@@ -150,6 +152,276 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
             rewardsPerLiquidityInsideX128,
             0,
             "Rewards per liquidity inside should have increased"
+        );
+    }
+
+    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_1_4_ZeroForOne()
+        public
+    {
+        _setUp(Constants.SQRT_RATIO_1_4);
+        int24 tickLower = -16_200;
+        int24 tickUpper = 60;
+
+        uint256 tokenId = positionManager.nextTokenId();
+        addLiquidity(
+            key,
+            10 ether,
+            10 ether,
+            tickLower,
+            tickUpper,
+            address(this)
+        );
+        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
+
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(swapRouter),
+            1 ether
+        );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: 1 ether,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 rewardsPerLiquidityInsideX128 = trackerHook
+            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
+
+        assertGt(
+            rewardsPerLiquidityInsideX128,
+            0,
+            "Rewards per liquidity inside should have increased"
+        );
+
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
+        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+
+        assertEq(
+            tick,
+            tickFromRewardTracker,
+            "Tick from reward tracker should be equal to the pool tick"
+        );
+    }
+
+    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_1_4_OneForZero()
+        public
+    {
+        _setUp(Constants.SQRT_RATIO_1_4);
+        int24 tickLower = -16_200;
+        int24 tickUpper = 60;
+
+        uint256 tokenId = positionManager.nextTokenId();
+        addLiquidity(
+            key,
+            10 ether,
+            10 ether,
+            tickLower,
+            tickUpper,
+            address(this)
+        );
+        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
+
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(swapRouter),
+            1 ether
+        );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: false,
+                amountIn: 1 ether,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 rewardsPerLiquidityInsideX128 = trackerHook
+            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
+
+        assertGt(
+            rewardsPerLiquidityInsideX128,
+            0,
+            "Rewards per liquidity inside should have increased"
+        );
+
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
+        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+
+        assertEq(
+            tick,
+            tickFromRewardTracker,
+            "Tick from reward tracker should be equal to the pool tick"
+        );
+    }
+
+    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_1_4_OneForZero_BigSwap()
+        public
+    {
+        _setUp(Constants.SQRT_RATIO_1_4);
+        int24 tickLower = -16_200;
+        int24 tickUpper = 60;
+
+        uint256 tokenId = positionManager.nextTokenId();
+        addLiquidity(
+            key,
+            10 ether,
+            10 ether,
+            tickLower,
+            tickUpper,
+            address(this)
+        );
+        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
+
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(swapRouter),
+            9 ether
+        );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: false,
+                amountIn: 9 ether,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 rewardsPerLiquidityInsideX128 = trackerHook
+            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
+
+        assertEq(
+            rewardsPerLiquidityInsideX128,
+            0,
+            "Rewards per liquidity inside should not have increased - the swap pushed the position out of range"
+        );
+
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
+        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+
+        assertEq(
+            tick,
+            tickFromRewardTracker,
+            "Tick from reward tracker should be equal to the pool tick"
+        );
+    }
+
+    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_4_1_ZeroForOne()
+        public
+    {
+        _setUp(Constants.SQRT_RATIO_4_1);
+        int24 tickLower = -60;
+        int24 tickUpper = 16_200;
+
+        uint256 tokenId = positionManager.nextTokenId();
+        addLiquidity(
+            key,
+            10 ether,
+            10 ether,
+            tickLower,
+            tickUpper,
+            address(this)
+        );
+        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
+
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(swapRouter),
+            1 ether
+        );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: 1 ether,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 rewardsPerLiquidityInsideX128 = trackerHook
+            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
+
+        assertGt(
+            rewardsPerLiquidityInsideX128,
+            0,
+            "Rewards per liquidity inside should have increased"
+        );
+
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
+        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+
+        assertEq(
+            tick,
+            tickFromRewardTracker,
+            "Tick from reward tracker should be equal to the pool tick"
+        );
+    }
+
+    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_4_1_OneForZero()
+        public
+    {
+        _setUp(Constants.SQRT_RATIO_4_1);
+        int24 tickLower = -60;
+        int24 tickUpper = 16_200;
+
+        uint256 tokenId = positionManager.nextTokenId();
+        addLiquidity(
+            key,
+            10 ether,
+            10 ether,
+            tickLower,
+            tickUpper,
+            address(this)
+        );
+        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
+
+        trackerHook.donateRewards(poolId, 1 ether);
+
+        IERC20(Currency.unwrap(currency0)).approve(
+            address(swapRouter),
+            1 ether
+        );
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: false,
+                amountIn: 1 ether,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 rewardsPerLiquidityInsideX128 = trackerHook
+            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
+
+        assertGt(
+            rewardsPerLiquidityInsideX128,
+            0,
+            "Rewards per liquidity inside should have increased"
+        );
+
+        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
+        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+
+        assertEq(
+            tick,
+            tickFromRewardTracker,
+            "Tick from reward tracker should be equal to the pool tick"
         );
     }
 
