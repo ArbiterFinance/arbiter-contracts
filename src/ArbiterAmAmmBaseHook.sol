@@ -420,8 +420,9 @@ abstract contract ArbiterAmAmmBaseHook is
                 )
             )
         );
-
         Currency currency = _getPoolRentCurrency(key);
+
+        slot1 = poolSlot1[poolId];
 
         // refund the remaining rentPerBlock to the previous winner
         uint128 remainingRent = slot1.remainingRent();
