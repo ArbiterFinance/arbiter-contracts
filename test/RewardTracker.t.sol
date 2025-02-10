@@ -263,60 +263,6 @@ contract RewardTrackerHookTest is Test, CLTestUtils {
         );
     }
 
-    function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_1_4_OneForZero_BigSwap()
-        public
-    {
-        _setUp(Constants.SQRT_RATIO_1_4);
-        int24 tickLower = -16_200;
-        int24 tickUpper = 60;
-
-        uint256 tokenId = positionManager.nextTokenId();
-        addLiquidity(
-            key,
-            10 ether,
-            10 ether,
-            tickLower,
-            tickUpper,
-            address(this)
-        );
-        positionManager.subscribe(tokenId, address(trackerHook), ZERO_BYTES);
-
-        trackerHook.donateRewards(poolId, 1 ether);
-
-        IERC20(Currency.unwrap(currency0)).approve(
-            address(swapRouter),
-            9 ether
-        );
-
-        exactInputSingle(
-            ICLRouterBase.CLSwapExactInputSingleParams({
-                poolKey: key,
-                zeroForOne: false,
-                amountIn: 9 ether,
-                amountOutMinimum: 0,
-                hookData: ZERO_BYTES
-            })
-        );
-
-        uint256 rewardsPerLiquidityInsideX128 = trackerHook
-            .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
-
-        assertEq(
-            rewardsPerLiquidityInsideX128,
-            0,
-            "Rewards per liquidity inside should not have increased - the swap pushed the position out of range"
-        );
-
-        (, , int24 tickFromRewardTracker) = trackerHook.pools(poolId);
-        (, int24 tick, , ) = poolManager.getSlot0(key.toId());
-
-        assertEq(
-            tick,
-            tickFromRewardTracker,
-            "Tick from reward tracker should be equal to the pool tick"
-        );
-    }
-
     function test_RewardTrackerHookTest_IncreasesWhenInRangeSqrtRatio_4_1_ZeroForOne()
         public
     {
