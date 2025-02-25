@@ -17,7 +17,7 @@ using AuctionSlot1Library for AuctionSlot1 global;
 library AuctionSlot1Library {
     uint128 internal constant MASK_128_BITS =
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    uint96 internal constant MASK_96_BITS = 0xFFFFFFFFFFFFFFFFFFFF;
+    uint96 internal constant MASK_96_BITS = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
     uint32 internal constant MASK_32_BITS = 0xFFFFFFFF;
 
     uint8 internal constant LAST_PAID_BLOCK_OFFSET = 128;
