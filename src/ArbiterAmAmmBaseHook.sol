@@ -515,6 +515,15 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolKey calldata key,
         address strategy
     ) external override {
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
+                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
+                )
+            )
+        );
+
         PoolId poolId = key.toId();
         if (
             msg.sender != winners[poolId] ||
