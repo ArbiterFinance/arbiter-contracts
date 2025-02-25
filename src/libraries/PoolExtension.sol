@@ -300,6 +300,11 @@ library PoolExtension {
     ) internal returns (int128 liquidityNet) {
         unchecked {
             TickInfo storage info = self.ticks[tick];
+
+            if (info.liquidityGross == 0) {
+                return 0;
+            }
+
             info.rewardsPerLiquidityOutsideX128 =
                 rewardsPerLiquidityCumulativeX128 -
                 info.rewardsPerLiquidityOutsideX128;
