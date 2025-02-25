@@ -84,6 +84,7 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
+            poolSlot0[poolId] = slot0.setLastActiveTick(tick);
             _payRentAndChangeStrategyIfNeeded(key);
             _handleActiveTickChange(
                 poolId,

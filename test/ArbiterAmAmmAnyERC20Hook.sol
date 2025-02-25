@@ -250,8 +250,14 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
 
         (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(poolId);
 
         assertEq(tick, 5, "Tick should be 5");
+        assertEq(
+            tick,
+            slot0.lastActiveTick(),
+            "Tick should be last active tick"
+        );
         IERC20(Currency.unwrap(currency1)).approve(
             address(swapRouter),
             1 ether
@@ -268,8 +274,14 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
         );
 
         (, int24 tick2, , ) = poolManager.getSlot0(key.toId());
+        slot0 = arbiterHook.poolSlot0(poolId);
 
         assertGt(tick2, 5, "Tick should be greater than 5");
+        assertEq(
+            tick2,
+            slot0.lastActiveTick(),
+            "Tick should be last active tick"
+        );
 
         uint256 rewardsPerLiquidityInsideX128After = arbiterHook
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);

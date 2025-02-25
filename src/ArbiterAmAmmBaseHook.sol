@@ -243,6 +243,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
+            poolSlot0[poolId] = slot0.setLastActiveTick(tick);
             _payRentAndChangeStrategyIfNeeded(key);
         }
 
