@@ -645,8 +645,6 @@ abstract contract ArbiterAmAmmBaseHook is
 
         poolSlot1[poolId] = slot1;
         poolSlot0[poolId] = slot0;
-
-        return;
     }
 
     function _distributeRent(
