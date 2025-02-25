@@ -8,16 +8,16 @@ import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol"
 import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
 import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
 import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
 import {AuctionSlot0, AuctionSlot0Library} from "./types/AuctionSlot0.sol";
 import {AuctionSlot1, AuctionSlot1Library} from "./types/AuctionSlot1.sol";
 
 import {IArbiterAmAmmHarbergerLease} from "./interfaces/IArbiterAmAmmHarbergerLease.sol";
-import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // TODO decide on the blockNumber storage size uint32 / uint48 / uint64
 
