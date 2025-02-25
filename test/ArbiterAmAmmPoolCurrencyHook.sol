@@ -1882,14 +1882,25 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         moveBlockBy(100);
 
         transferToAndDepositAs(user2Deposit * 1000000, user1);
-        uint32 rentEndBlock3 = uint32(
+        uint32 user1RentEndBlock2 = uint32(
             STARTING_BLOCK + 10 + 100 + DEFAULT_MINIMUM_RENT_BLOCKS
         );
+        uint128 user1RentPerBlock2 = user2RentPerBlock * 100;
+
+        uint128 user1TotalRent2 = user2RentPerBlock *
+            100 *
+            (DEFAULT_MINIMUM_RENT_BLOCKS);
+        uint128 user1AuctionFee2 = (user1TotalRent2 * hookAuctionFee) / 1e6;
+
+        uint128 user2RemainingRentBeforeUser1Overbids2 = arbiterHook
+            .poolSlot1(id)
+            .remainingRent();
+
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
-            user2RentPerBlock * 100,
-            rentEndBlock3,
+            uint80(user1RentPerBlock2),
+            user1RentEndBlock2,
             address(strategyUser1)
         );
         vm.stopPrank();
@@ -1902,10 +1913,18 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             uint128 collectedFee2
         ) = arbiterHook.auctionFees(id);
 
+        uint128 rentFromBlocksPassed = 100 * user2RentPerBlock;
+
+        uint128 feeRefund2 = uint128(
+            (uint256(user2AuctionFee) *
+                (user2RemainingRentBeforeUser1Overbids2 -
+                    rentFromBlocksPassed)) / user2TotalRent
+        );
+
         assertEq(
-            collectedFee,
             collectedFee2,
-            "Collected fee should be the same after user1 overbid"
+            collectedFee + (user2AuctionFee - feeRefund2),
+            "The fee should be collected for user1 after the second overbid"
         );
     }
     function test_ArbiterAmAmmPoolCurrencyHook_OverbidMultipleBids_RemainingRentCalculation()
