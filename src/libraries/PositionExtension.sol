@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.26;
 
-import {FullMath} from "pancake-v4-core/src/pool-cl/libraries/FullMath.sol";
-import {FixedPoint128} from "pancake-v4-core/src/pool-cl/libraries/FixedPoint128.sol";
+import {FullMath} from "infinity-core/src/pool-cl/libraries/FullMath.sol";
+import {FixedPoint128} from "infinity-core/src/pool-cl/libraries/FixedPoint128.sol";
 
 /// @title PositionExtension
 /// @notice Positions represent an owner address' liquidity between a lower and upper tick boundary

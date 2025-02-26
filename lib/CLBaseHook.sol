@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {HOOKS_BEFORE_INITIALIZE_OFFSET, HOOKS_AFTER_INITIALIZE_OFFSET, HOOKS_BEFORE_ADD_LIQUIDITY_OFFSET, HOOKS_AFTER_ADD_LIQUIDITY_OFFSET, HOOKS_BEFORE_REMOVE_LIQUIDITY_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDITY_OFFSET, HOOKS_BEFORE_SWAP_OFFSET, HOOKS_AFTER_SWAP_OFFSET, HOOKS_BEFORE_DONATE_OFFSET, HOOKS_AFTER_DONATE_OFFSET, HOOKS_BEFORE_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_ADD_LIQUIDIY_RETURNS_DELTA_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDIY_RETURNS_DELTA_OFFSET} from "pancake-v4-core/src/pool-cl/interfaces/ICLHooks.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
-import {IHooks} from "pancake-v4-core/src/interfaces/IHooks.sol";
-import {IVault} from "pancake-v4-core/src/interfaces/IVault.sol";
-import {ICLHooks} from "pancake-v4-core/src/pool-cl/interfaces/ICLHooks.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {CLPoolManager} from "pancake-v4-core/src/pool-cl/CLPoolManager.sol";
+import {HOOKS_BEFORE_INITIALIZE_OFFSET, HOOKS_AFTER_INITIALIZE_OFFSET, HOOKS_BEFORE_ADD_LIQUIDITY_OFFSET, HOOKS_AFTER_ADD_LIQUIDITY_OFFSET, HOOKS_BEFORE_REMOVE_LIQUIDITY_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDITY_OFFSET, HOOKS_BEFORE_SWAP_OFFSET, HOOKS_AFTER_SWAP_OFFSET, HOOKS_BEFORE_DONATE_OFFSET, HOOKS_AFTER_DONATE_OFFSET, HOOKS_BEFORE_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_ADD_LIQUIDIY_RETURNS_DELTA_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDIY_RETURNS_DELTA_OFFSET} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
+import {BeforeSwapDelta} from "infinity-core/src/types/BeforeSwapDelta.sol";
+import {IHooks} from "infinity-core/src/interfaces/IHooks.sol";
+import {IVault} from "infinity-core/src/interfaces/IVault.sol";
+import {ICLHooks} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {CLPoolManager} from "infinity-core/src/pool-cl/CLPoolManager.sol";
 
 contract CLBaseHook is ICLHooks {
     error NotPoolManager();
@@ -99,7 +99,7 @@ contract CLBaseHook is ICLHooks {
     }
 
     /// @dev Helper function when the hook needs to get a lock from the vault. See
-    ///      https://github.com/pancakeswap/pancake-v4-hooks oh hooks which perform vault.lock()
+    ///      https://github.com/pancakeswap/infinity-hooks oh hooks which perform vault.lock()
     function lockAcquired(
         bytes calldata data
     ) external virtual vaultOnly returns (bytes memory) {

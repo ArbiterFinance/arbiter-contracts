@@ -4,16 +4,16 @@ pragma solidity ^0.8.19;
 
 import {CommonBase} from "forge-std/Base.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {IVault} from "pancake-v4-core/src/interfaces/IVault.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {ICLPositionManager} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
-import {CLPositionManager} from "pancake-v4-periphery/src/pool-cl/CLPositionManager.sol";
+import {IVault} from "infinity-core/src/interfaces/IVault.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {ICLPositionManager} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
+import {ICLPositionDescriptor} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionDescriptor.sol";
+import {IWETH9} from "infinity-periphery/src/interfaces/external/IWETH9.sol";
+import {CLPositionManager} from "infinity-periphery/src/pool-cl/CLPositionManager.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
-import {Planner, Plan} from "pancake-v4-periphery/src/libraries/Planner.sol";
-import {Actions} from "pancake-v4-periphery/src/libraries/Actions.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {ICLPositionDescriptor} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionDescriptor.sol";
-import {IWETH9} from "pancake-v4-periphery/src/interfaces/external/IWETH9.sol";
+import {Planner, Plan} from "infinity-periphery/src/libraries/Planner.sol";
+import {Actions} from "infinity-periphery/src/libraries/Actions.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
 
 contract MockCLPositionManager is CLPositionManager, CommonBase {
     using Planner for Plan;
@@ -21,17 +21,15 @@ contract MockCLPositionManager is CLPositionManager, CommonBase {
     constructor(
         IVault _vault,
         ICLPoolManager _clPoolManager,
-        IAllowanceTransfer _permit2,
-        ICLPositionDescriptor _tokenDescriptor,
-        IWETH9 _weth9
+        IAllowanceTransfer _permit2
     )
         CLPositionManager(
             _vault,
             _clPoolManager,
             _permit2,
             500000,
-            _tokenDescriptor,
-            _weth9
+            ICLPositionDescriptor(address(0)),
+            IWETH9(address(0))
         )
     {}
 

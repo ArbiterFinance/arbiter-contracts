@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {PoolId} from "pancake-v4-core/src/types/PoolId.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {ICLPositionManager} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
+import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
+import {Currency, CurrencyLibrary} from "infinity-core/src/types/Currency.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
+import {PoolId} from "infinity-core/src/types/PoolId.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {ICLPositionManager} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
 import {AuctionSlot0} from "./types/AuctionSlot0.sol";
-import {CLPool} from "pancake-v4-core/src/pool-cl/libraries/CLPool.sol";
-import {CLPoolGetters} from "pancake-v4-core/src/pool-cl/libraries/CLPoolGetters.sol";
-import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {CLPool} from "infinity-core/src/pool-cl/libraries/CLPool.sol";
+import {CLPoolGetters} from "infinity-core/src/pool-cl/libraries/CLPoolGetters.sol";
+import {CLPoolParametersHelper} from "infinity-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 import {RewardTracker} from "./RewardTracker.sol";
@@ -131,7 +131,7 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         _payRentAndChangeStrategyIfNeeded(key);
     }
 
-    function _beforeOnTransferTracker(PoolKey memory key) internal override {
+    function _beforeOnBurnTracker(PoolKey memory key) internal override {
         _payRentAndChangeStrategyIfNeeded(key);
     }
 

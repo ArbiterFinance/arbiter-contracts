@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IArbiterAmAmmHarbergerLease} from "./IArbiterAmAmmHarbergerLease.sol";
 import {IRewardTracker} from "./IRewardTracker.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
 
 /// @title amAMM With Cake Rewards Interface
 /// @notice This interface combines the Harberger Lease and Reward Tracker hooks

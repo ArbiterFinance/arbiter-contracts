@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import {SafeCast} from "pancake-v4-core/src/libraries/SafeCast.sol";
-import {TickBitmap} from "pancake-v4-core/src/pool-cl/libraries/TickBitmap.sol";
-import {ProtocolFeeLibrary} from "pancake-v4-core/src/libraries/ProtocolFeeLibrary.sol";
-import {LiquidityMath} from "pancake-v4-core/src/pool-cl/libraries/LiquidityMath.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
+import {SafeCast} from "infinity-core/src/libraries/SafeCast.sol";
+import {TickBitmap} from "infinity-core/src/pool-cl/libraries/TickBitmap.sol";
+import {ProtocolFeeLibrary} from "infinity-core/src/libraries/ProtocolFeeLibrary.sol";
+import {LiquidityMath} from "infinity-core/src/pool-cl/libraries/LiquidityMath.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
 
 /// @notice a library that records staked/subscribed liquiduty and allows for the calculation of
 ///         the rewards per liquidity of a position

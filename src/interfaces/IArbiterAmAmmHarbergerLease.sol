@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {PoolId} from "pancake-v4-core/src/types/PoolId.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {PoolId} from "infinity-core/src/types/PoolId.sol";
 
 /// @title Arbiter AmAmm Harberger Lease
 /// @notice Interface for an auction system based on Harberger Tax principles.
