@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 /**
- * @dev AuctionSlot1 is a tightly packed data structure that holds multiple parameters
- * related to the auction's financial state and configuration.
+ * @dev AuctionSlot1 is a tightly packed data structure that holds multiple variables
+ * related to the rent state that change over time.
  *
  * - [0..128): `remaining rent` (128 bits) - The amount of rent that is still owed for the current rent period.
  * - [128..160): `last paid block` (32 bits) - The block number of the last block when rent was paid.

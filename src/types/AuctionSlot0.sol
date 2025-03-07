@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {AuctionSlot1Library, AuctionSlot1} from "./AuctionSlot1.sol";
 
 /**
- * @dev AuctionSlot0 is a tightly packed data structure that holds multiple parameters
+ * @dev AuctionSlot0 is a tightly packed data structure that holds parameters & variables
  * related to the auction's configuration and state.
  *
  * - [0..160): `strategy address` (160 bits) - The address of the current strategy contract.

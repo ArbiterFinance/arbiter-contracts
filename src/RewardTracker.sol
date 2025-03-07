@@ -26,9 +26,18 @@ abstract contract RewardTracker is IRewardTracker {
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
 
+    /// @notice Mapping of poolId to the tracked pool state
+    /// @dev Key is PoolId, value is PoolExtension state struct
     mapping(PoolId => PoolExtension.State) public pools;
+
+    /// @notice Mapping of tokenId to the tracked position state
+    /// @dev Key is tokenId, value is PositionExtension state struct
     mapping(uint256 => PositionExtension.State) public positions;
+
+    /// @notice Mapping of address to the accrued rewards
+    /// @dev Key is address, value is accrued rewards
     mapping(address => uint256) public accruedRewards;
+
     ICLPositionManager public immutable positionManager;
 
     modifier onlyPositionManager() {

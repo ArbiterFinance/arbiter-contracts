@@ -16,23 +16,30 @@ library PoolExtension {
     using ProtocolFeeLibrary for *;
     using LPFeeLibrary for uint24;
 
-    // info stored for each initialized individual tick
+    /// @notice info stored for each initialized individual tick
     struct TickInfo {
-        // the total position liquidity that references this tick
+        /// @notice the total position liquidity that references this tick
         uint128 liquidityGross;
-        // amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
+        /// @notice amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
         int128 liquidityNet;
-        // the rewards per unit of liquidity on the _other_ side of this tick (relative to the current tick)
-        // only has relative meaning, not absolute — the value depends on when the tick is initialized
+        /// @notice the rewards per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+        /// @notice only has relative meaning, not absolute — the value depends on when the tick is initialized
         uint256 rewardsPerLiquidityOutsideX128;
     }
 
-    /// @dev The state of a pool extension
+    /// @notice Stores necessary info to track rewards per liquidity across ticks
     struct State {
+        /// @notice rewards per liquidity of the pool
         uint256 rewardsPerLiquidityCumulativeX128;
+        /// @notice the total liquidity of the pool participating in rewards
         uint128 liquidity;
+        /// @notice the current tick
         int24 tick;
+        /// @notice the tick info for each initialized tick
+        /// @dev Key is the tick, value is the TickInfo struct
         mapping(int24 tick => TickInfo) ticks;
+        /// @notice the tick bitmap used to efficiently find initialized ticks & flip
+        /// @dev Key is the word position, value is the word
         mapping(int16 wordPos => uint256) tickBitmap;
     }
 

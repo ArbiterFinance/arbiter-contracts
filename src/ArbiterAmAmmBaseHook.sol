@@ -65,16 +65,37 @@ abstract contract ArbiterAmAmmBaseHook is
     uint8 internal _defaultStrategyGasLimit = 13;
     uint16 internal _defaultSwapFee = 4e2; // 0.04%
 
+    /// @notice Mapping of the PoolId to the auction's configuration and state.
+    /// @dev Key is the PoolId, value is the AuctionSlot0 struct
     mapping(PoolId => AuctionSlot0) public poolSlot0;
+
+    /// @notice Mapping of the PoolId to the currently active rent state.
+    /// @dev Key is the PoolId, value is the AuctionSlot1 struct
     mapping(PoolId => AuctionSlot1) public poolSlot1;
+
+    /// @notice Mapping of the PoolId to the address of the current winner.
+    /// @dev Key is the PoolId, value is the address of the winner
     mapping(PoolId => address) public winners;
+
+    /// @notice Mapping of the PoolId to the address of the current winner's strategy contract.
+    /// @dev Key is the PoolId, value is the address of the winner's strategy contract.
     mapping(PoolId => address) public winnerStrategies;
+
+    /// @notice Mapping of the user's address to deposits of rent currencies.
+    /// @dev Key is the user's address, value is a mapping of the currency to the deposit amount.
     mapping(address => mapping(Currency => uint256)) public deposits;
+
+    /// @notice Mapping of the PoolId to the auction fee state.
+    /// @dev Key is the PoolId, value is the AuctionFee struct
     mapping(PoolId => AuctionFee) public auctionFees;
 
+    /// @notice Struct to hold the auction fee state.
     struct AuctionFee {
+        /// @notice The initial remaining rent amount when the auction fee was locked.
         uint128 initialRemainingRent;
+        /// @notice The amount of rent that is locked as the auction fee.
         uint128 feeLocked;
+        /// @notice The amount of fees collected from the auction.
         uint128 collectedFee;
     }
 
