@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
 import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
 import {Currency} from "infinity-core/src/types/Currency.sol";
