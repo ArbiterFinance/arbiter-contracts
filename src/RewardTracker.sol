@@ -26,6 +26,9 @@ abstract contract RewardTracker is IRewardTracker {
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
 
+    /// @dev The `account` is not Position Manager.
+    error PositionManagerOnlyExecutor(address account);
+
     /// @notice Mapping of poolId to the tracked pool state
     /// @dev Key is PoolId, value is PoolExtension state struct
     mapping(PoolId => PoolExtension.State) public pools;
@@ -43,7 +46,7 @@ abstract contract RewardTracker is IRewardTracker {
     modifier onlyPositionManager() {
         require(
             msg.sender == address(positionManager),
-            "InRangeIncentiveHook: only position manager"
+            PositionManagerOnlyExecutor(msg.sender)
         );
         _;
     }

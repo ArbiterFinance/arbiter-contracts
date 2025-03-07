@@ -36,6 +36,9 @@ abstract contract ArbiterAmAmmBaseHook is
     using AuctionSlot0Library for AuctionSlot0;
     using AuctionSlot1Library for AuctionSlot1;
 
+    /// @dev Returned when mimum rent blocks is attempted to be set to zero.
+    error MinimumRentBlocksZero();
+
     enum CallbackAction {
         DEPOSIT_OR_WITHDRAW,
         PAY_RENT_AND_CHANGE_STRATEGY
@@ -684,7 +687,7 @@ abstract contract ArbiterAmAmmBaseHook is
     }
 
     function setMinRentBlocks(uint32 minRentBlocks_) external onlyOwner {
-        require(minRentBlocks_ > 0, "minRentBlock == 0");
+        require(minRentBlocks_ > 0, MinimumRentBlocksZero());
         _minRentBlocks = minRentBlocks_;
     }
 
