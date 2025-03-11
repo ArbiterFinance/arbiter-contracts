@@ -225,8 +225,8 @@ abstract contract ArbiterAmAmmBaseHook is
 
         uint256 lpFee = absTotalFees - strategyFee;
 
-        // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
-        // If amountSpecified > 0, the swap is exact-out and it's the bought token.
+        // Determine the fee currency based on the swap type.
+        // The fee is always charged in the token that the swapper is receiving (the bought token).
         bool exactOut = params.amountSpecified > 0;
 
         bool isFeeCurrency0 = !exactOut == params.zeroForOne;
@@ -557,7 +557,7 @@ abstract contract ArbiterAmAmmBaseHook is
         winnerStrategies[poolId] = strategy;
         poolSlot0[poolId].setShouldChangeStrategy(true);
 
-        emit ChangeStrategy(poolId, strategy);
+        emit StrategyChanged(poolId, strategy);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -684,15 +684,18 @@ abstract contract ArbiterAmAmmBaseHook is
 
     function setTransitionBlocks(uint32 transitionBlocks_) external onlyOwner {
         _transitionBlocks = transitionBlocks_;
+        emit TransitionBlocksSet(transitionBlocks_);
     }
 
     function setMinRentBlocks(uint32 minRentBlocks_) external onlyOwner {
         require(minRentBlocks_ > 0, MinimumRentBlocksZero());
         _minRentBlocks = minRentBlocks_;
+        emit MinRentBlocksSet(minRentBlocks_);
     }
 
     function setOverbidFactor(uint24 overbidFactor_) external onlyOwner {
         _overbidFactor = overbidFactor_;
+        emit OverbidFactorSet(overbidFactor_);
     }
 
     function setWinnerFeeSharePart(
@@ -702,6 +705,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setWinnerFeeSharePart(
             winnerFeeSharePart
         );
+        emit WinnerFeeSharePartSet(key.toId(), winnerFeeSharePart);
     }
 
     function setStrategyGasLimit(
@@ -711,6 +715,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setStrategyGasLimit(
             strategyGasLimit
         );
+        emit StrategyGasLimitSet(key.toId(), strategyGasLimit);
     }
 
     function setDefaultSwapFee(
@@ -720,6 +725,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setDefaultSwapFee(
             defaultSwapFee
         );
+        emit DefaultSwapFeeSet(key.toId(), defaultSwapFee);
     }
 
     function setAuctionFee(
@@ -727,6 +733,7 @@ abstract contract ArbiterAmAmmBaseHook is
         uint24 auctionFee
     ) external onlyOwner {
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setAuctionFee(auctionFee);
+        emit AuctionFeeSet(key.toId(), auctionFee);
     }
 
     function collectAuctionFees(

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.26;
 
 import {IArbiterAmAmmHarbergerLease} from "./IArbiterAmAmmHarbergerLease.sol";
 import {IRewardTracker} from "./IRewardTracker.sol";

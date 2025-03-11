@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.26;
 
 import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
 import {PoolId} from "infinity-core/src/types/PoolId.sol";
@@ -34,7 +34,17 @@ interface IArbiterAmAmmHarbergerLease {
         uint32 rentEndBlock,
         address strategy
     );
-    event ChangeStrategy(PoolId indexed id, address strategy);
+    event StrategyChanged(PoolId indexed poolId, address newStrategy);
+    event TransitionBlocksSet(uint32 transitionBlocks_);
+    event MinRentBlocksSet(uint32 minRentBlocks_);
+    event OverbidFactorSet(uint24 overbidFactor_);
+    event WinnerFeeSharePartSet(
+        PoolId indexed poolId,
+        uint24 winnerFeeSharePart
+    );
+    event StrategyGasLimitSet(PoolId indexed poolId, uint8 strategyGasLimit);
+    event DefaultSwapFeeSet(PoolId indexed poolId, uint16 defaultSwapFee);
+    event AuctionFeeSet(PoolId indexed poolId, uint24 auctionFee);
 
     /// @return  The minimum time in blocks that an overbidding rent must last
     function minimumRentBlocks(
