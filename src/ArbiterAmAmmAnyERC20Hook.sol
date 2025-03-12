@@ -100,6 +100,12 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
+    function _payRentAndChangeStrategyFromExternCall(
+        PoolKey memory key
+    ) internal override {
+        _payRentAndChangeStrategyIfNeeded(key);
+    }
+
     function _getPoolRentCurrency(
         PoolKey memory
     ) internal view override returns (Currency) {

@@ -32,6 +32,19 @@ contract ArbiterAmAmmPoolCurrencyHook is ArbiterAmAmmBaseHook {
     ///////////////////////////////////////////////////////////////////////////////////
     //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
+
+    function _payRentAndChangeStrategyFromExternCall(
+        PoolKey memory key
+    ) internal override {
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
+                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
+                )
+            )
+        );
+    }
     function _getPoolRentCurrency(
         PoolKey memory key
     ) internal view override returns (Currency) {

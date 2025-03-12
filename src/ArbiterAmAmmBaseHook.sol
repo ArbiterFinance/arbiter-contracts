@@ -435,14 +435,7 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        vault.lock(
-            abi.encode(
-                CallbackData(
-                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
-                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
-                )
-            )
-        );
+        _payRentAndChangeStrategyFromExternCall(key);
         Currency currency = _getPoolRentCurrency(key);
 
         slot1 = poolSlot1[poolId];
@@ -532,19 +525,16 @@ abstract contract ArbiterAmAmmBaseHook is
         emit Withdraw(msg.sender, asset, amount);
     }
 
+    function _payRentAndChangeStrategyFromExternCall(
+        PoolKey memory key
+    ) internal virtual;
+
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function changeStrategy(
         PoolKey calldata key,
         address strategy
     ) external override {
-        vault.lock(
-            abi.encode(
-                CallbackData(
-                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
-                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
-                )
-            )
-        );
+        _payRentAndChangeStrategyFromExternCall(key);
 
         PoolId poolId = key.toId();
         if (
@@ -576,6 +566,7 @@ abstract contract ArbiterAmAmmBaseHook is
                 (PayRentAndChangeStrategyCallbackPayload)
             );
             _payRentAndChangeStrategyIfNeeded(data.key);
+            return "";
         } else {
             DepositOrWithdrawCallbackPayload memory data = abi.decode(
                 cbData.data,
