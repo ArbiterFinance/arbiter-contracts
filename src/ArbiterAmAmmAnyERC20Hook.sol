@@ -48,6 +48,35 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     ////////////////////////////////////// HOOK ///////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
+    /// @notice Specify hook permissions. `beforeSwapReturnDelta` is also set to charge custom swap fees that go to the strategist instead of LPs.
+    function getHooksRegistrationBitmap()
+        external
+        pure
+        virtual
+        override
+        returns (uint16)
+    {
+        return
+            _hooksRegistrationBitmapFrom(
+                Permissions({
+                    beforeInitialize: false,
+                    afterInitialize: true,
+                    beforeAddLiquidity: true,
+                    beforeRemoveLiquidity: false,
+                    afterAddLiquidity: false,
+                    afterRemoveLiquidity: false,
+                    beforeSwap: true,
+                    afterSwap: true,
+                    beforeDonate: false,
+                    afterDonate: false,
+                    beforeSwapReturnsDelta: true,
+                    afterSwapReturnsDelta: false,
+                    afterAddLiquidityReturnsDelta: false,
+                    afterRemoveLiquidityReturnsDelta: false
+                })
+            );
+    }
+
     /// @dev Reverts if dynamic fee flag is not set or if the pool is not initialized with dynamic fees.
     function afterInitialize(
         address,
@@ -85,7 +114,6 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
             poolSlot0[poolId] = slot0.setLastActiveTick(tick);
-            _payRentAndChangeStrategyWhenLocked(key);
             _handleActiveTickChange(
                 poolId,
                 tick,
