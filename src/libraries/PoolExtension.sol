@@ -193,11 +193,14 @@ library PoolExtension {
                 if (self.isInitialized(currentTick - 1, tickSpacing)) {
                     nextTick = currentTick - 1;
                 } else {
-                    nextTick = self.tickBitmap.nextInitializedTickWithinOneWord(
-                        currentTick - 1,
-                        tickSpacing,
-                        lte
-                    );
+                    (int24 _nextTick, ) = self
+                        .tickBitmap
+                        .nextInitializedTickWithinOneWord(
+                            currentTick - 1,
+                            tickSpacing,
+                            lte
+                        );
+                    nextTick = _nextTick;
                 }
 
                 if (nextTick < targetTick) {
