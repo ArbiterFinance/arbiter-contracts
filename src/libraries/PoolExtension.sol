@@ -234,7 +234,7 @@ library PoolExtension {
                 // we cross the nextTick
                 int128 liquidityNet = PoolExtension.crossTick(
                     self,
-                    currentTick,
+                    nextTick,
                     self.rewardsPerLiquidityCumulativeX128
                 );
                 liquidityChange += liquidityNet;
