@@ -169,7 +169,7 @@ abstract contract ArbiterAmAmmBaseHook is
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual override poolManagerOnly returns (bytes4) {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
         return this.beforeAddLiquidity.selector;
     }
 
@@ -266,7 +266,7 @@ abstract contract ArbiterAmAmmBaseHook is
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
             poolSlot0[poolId] = slot0.setLastActiveTick(tick);
-            _payRentAndChangeStrategyIfNeeded(key);
+            _payRentAndChangeStrategyWhenLocked(key);
         }
 
         return (this.afterSwap.selector, 0);
@@ -435,7 +435,7 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        _payRentAndChangeStrategyFromExternCall(key);
+        _payRentAndChangeStrategyWhenNotLocked(key);
         Currency currency = _getPoolRentCurrency(key);
 
         slot1 = poolSlot1[poolId];
@@ -525,7 +525,7 @@ abstract contract ArbiterAmAmmBaseHook is
         emit Withdraw(msg.sender, asset, amount);
     }
 
-    function _payRentAndChangeStrategyFromExternCall(
+    function _payRentAndChangeStrategyWhenNotLocked(
         PoolKey memory key
     ) internal virtual;
 
@@ -534,7 +534,7 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolKey calldata key,
         address strategy
     ) external override {
-        _payRentAndChangeStrategyFromExternCall(key);
+        _payRentAndChangeStrategyWhenNotLocked(key);
 
         PoolId poolId = key.toId();
         if (
@@ -565,7 +565,7 @@ abstract contract ArbiterAmAmmBaseHook is
                 cbData.data,
                 (PayRentAndChangeStrategyCallbackPayload)
             );
-            _payRentAndChangeStrategyIfNeeded(data.key);
+            _payRentAndChangeStrategyWhenLocked(data.key);
             return "";
         } else {
             DepositOrWithdrawCallbackPayload memory data = abi.decode(
@@ -613,7 +613,7 @@ abstract contract ArbiterAmAmmBaseHook is
         return slot0;
     }
 
-    function _payRentAndChangeStrategyIfNeeded(PoolKey memory key) internal {
+    function _payRentAndChangeStrategyWhenLocked(PoolKey memory key) internal {
         PoolId poolId = key.toId();
         AuctionSlot1 slot1 = poolSlot1[poolId];
 

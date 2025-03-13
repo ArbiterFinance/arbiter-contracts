@@ -33,7 +33,7 @@ contract ArbiterAmAmmPoolCurrencyHook is ArbiterAmAmmBaseHook {
     //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    function _payRentAndChangeStrategyFromExternCall(
+    function _payRentAndChangeStrategyWhenNotLocked(
         PoolKey memory key
     ) internal override {
         vault.lock(

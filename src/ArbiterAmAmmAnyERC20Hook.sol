@@ -85,7 +85,7 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
         AuctionSlot0 slot0 = poolSlot0[poolId];
         if (tick != slot0.lastActiveTick()) {
             poolSlot0[poolId] = slot0.setLastActiveTick(tick);
-            _payRentAndChangeStrategyIfNeeded(key);
+            _payRentAndChangeStrategyWhenLocked(key);
             _handleActiveTickChange(
                 poolId,
                 tick,
@@ -100,10 +100,10 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
 
-    function _payRentAndChangeStrategyFromExternCall(
+    function _payRentAndChangeStrategyWhenNotLocked(
         PoolKey memory key
     ) internal override {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
     }
 
     function _getPoolRentCurrency(
@@ -124,21 +124,21 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     ///////////////////////////////////////////////////////////////////////////////////
 
     function _beforeOnSubscribeTracker(PoolKey memory key) internal override {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
     }
 
     function _beforeOnUnubscribeTracker(PoolKey memory key) internal override {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
     }
 
     function _beforeOnModifyLiquidityTracker(
         PoolKey memory key
     ) internal override {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
     }
 
     function _beforeOnBurnTracker(PoolKey memory key) internal override {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
     }
 
     function collectRewards(address to) external returns (uint256 rewards) {
