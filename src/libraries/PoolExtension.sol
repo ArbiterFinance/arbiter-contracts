@@ -161,6 +161,20 @@ library PoolExtension {
         }
     }
 
+    function isInitialized(
+        State storage self,
+        int24 tick,
+        int24 tickSpacing
+    ) internal view returns (bool) {
+        unchecked {
+            if (tick % tickSpacing != 0) return false;
+            (int16 wordPos, uint8 bitPos) = TickBitmap.position(
+                tick / tickSpacing
+            );
+            return self.tickBitmap[wordPos] & (1 << bitPos) != 0;
+        }
+    }
+
     function crossToTargetTick(
         State storage self,
         int24 tickSpacing,
@@ -175,28 +189,29 @@ library PoolExtension {
 
         if (lte) {
             while (targetTick < currentTick) {
-                (int24 nextTick, ) = self
-                    .tickBitmap
-                    .nextInitializedTickWithinOneWord(
+                int24 nextTick;
+                if (self.isInitialized(currentTick - 1, tickSpacing)) {
+                    nextTick = currentTick - 1;
+                } else {
+                    nextTick = self.tickBitmap.nextInitializedTickWithinOneWord(
                         currentTick - 1,
                         tickSpacing,
                         lte
                     );
+                }
 
                 if (nextTick < targetTick) {
                     nextTick = targetTick;
                 }
 
                 // we cross through the currentTick to the nextTick (nextTick is not crossed)
-                if (nextTick < currentTick) {
-                    int128 liquidityNet = -PoolExtension.crossTick(
-                        self,
-                        currentTick,
-                        self.rewardsPerLiquidityCumulativeX128
-                    );
-                    liquidityChange += liquidityNet;
-                    currentTick = nextTick;
-                }
+                int128 liquidityNet = -PoolExtension.crossTick(
+                    self,
+                    currentTick,
+                    self.rewardsPerLiquidityCumulativeX128
+                );
+                liquidityChange += liquidityNet;
+                currentTick = nextTick;
             }
         } else {
             // going right
