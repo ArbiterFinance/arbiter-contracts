@@ -175,51 +175,51 @@ library PoolExtension {
 
         if (lte) {
             while (targetTick < currentTick) {
-                (int24 nextTick, ) = self
+                (int24 nextTick, bool initialized) = self
                     .tickBitmap
                     .nextInitializedTickWithinOneWord(
-                        currentTick - 1,
+                        currentTick,
                         tickSpacing,
-                        lte
+                        true
                     );
 
-                if (nextTick < targetTick) {
-                    nextTick = targetTick;
+                if (nextTick <= targetTick) {
+                    break;
                 }
 
-                // we cross through the currentTick to the nextTick (nextTick is not crossed)
-                if (nextTick < currentTick) {
+                if (initialized) {
                     int128 liquidityNet = -PoolExtension.crossTick(
                         self,
-                        currentTick,
+                        nextTick,
                         self.rewardsPerLiquidityCumulativeX128
                     );
                     liquidityChange += liquidityNet;
-                    currentTick = nextTick;
                 }
+                currentTick = nextTick - 1;
             }
         } else {
             // going right
             while (currentTick < targetTick) {
-                (int24 nextTick, ) = self
+                (int24 nextTick, bool initialized) = self
                     .tickBitmap
                     .nextInitializedTickWithinOneWord(
                         currentTick,
                         tickSpacing,
-                        lte
+                        false
                     );
 
                 if (nextTick > targetTick) {
-                    nextTick = targetTick;
+                    break;
                 }
 
-                // we cross the nextTick
-                int128 liquidityNet = PoolExtension.crossTick(
-                    self,
-                    currentTick,
-                    self.rewardsPerLiquidityCumulativeX128
-                );
-                liquidityChange += liquidityNet;
+                if (initialized) {
+                    int128 liquidityNet = PoolExtension.crossTick(
+                        self,
+                        nextTick,
+                        self.rewardsPerLiquidityCumulativeX128
+                    );
+                    liquidityChange += liquidityNet;
+                }
                 currentTick = nextTick;
             }
         }

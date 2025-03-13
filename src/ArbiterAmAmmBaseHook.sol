@@ -129,7 +129,7 @@ abstract contract ArbiterAmAmmBaseHook is
                     afterAddLiquidity: false,
                     afterRemoveLiquidity: false,
                     beforeSwap: true,
-                    afterSwap: true,
+                    afterSwap: false,
                     beforeDonate: false,
                     afterDonate: false,
                     beforeSwapReturnsDelta: true,
@@ -188,9 +188,8 @@ abstract contract ArbiterAmAmmBaseHook is
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         PoolId poolId = key.toId();
+        _payRentAndChangeStrategyWhenLocked(key);
         AuctionSlot0 slot0 = poolSlot0[poolId];
-        slot0 = _changeStrategyIfNeeded(slot0, poolId);
-        poolSlot0[poolId] = slot0;
         address strategy = slot0.strategyAddress();
         uint24 fee = slot0.defaultSwapFee();
         // If no strategy is set, the swap fee is just set to the default value
@@ -251,25 +250,6 @@ abstract contract ArbiterAmAmmBaseHook is
                 : toBeforeSwapDelta(-int128(totalFees), 0),
             LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
-    }
-
-    function afterSwap(
-        address,
-        PoolKey calldata key,
-        ICLPoolManager.SwapParams calldata,
-        BalanceDelta,
-        bytes calldata
-    ) external virtual override poolManagerOnly returns (bytes4, int128) {
-        PoolId poolId = key.toId();
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
-
-        AuctionSlot0 slot0 = poolSlot0[poolId];
-        if (tick != slot0.lastActiveTick()) {
-            poolSlot0[poolId] = slot0.setLastActiveTick(tick);
-            _payRentAndChangeStrategyWhenLocked(key);
-        }
-
-        return (this.afterSwap.selector, 0);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////

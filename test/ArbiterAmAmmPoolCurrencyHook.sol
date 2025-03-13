@@ -1373,8 +1373,31 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             address(strategyUser2),
             key.currency0
         );
+
         assertEq(
             strategyUser2Balance,
+            0,
+            "Strategy user2 did receive fees in the same block as the overbid"
+        );
+
+        moveBlockBy(1);
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 strategyUser2Balance2 = vault.balanceOf(
+            address(strategyUser2),
+            key.currency0
+        );
+        assertEq(
+            strategyUser2Balance2,
             expectedFeeAmountUser2,
             "Strategy user2 did not receive the correct fees after winning"
         );
@@ -1473,6 +1496,29 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint128 amountIn = 1e18;
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency0
+        );
+        assertEq(
+            strategyUser2Balance,
+            0,
+            "Strategy user2 did receive fees in the same block as the overbid"
+        );
+
+        moveBlockBy(1);
+
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
                 poolKey: key,
@@ -1510,12 +1556,12 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
 
-        uint256 strategyUser2Balance = vault.balanceOf(
+        uint256 strategyUser2Balance2 = vault.balanceOf(
             address(strategyUser2),
             key.currency0
         );
         assertEq(
-            strategyUser2Balance,
+            strategyUser2Balance2,
             expectedFeeAmountUser2,
             "Strategy user2 did not receive the correct fees after winning"
         );
