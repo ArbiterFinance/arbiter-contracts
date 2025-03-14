@@ -188,7 +188,7 @@ abstract contract ArbiterAmAmmBaseHook is
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         PoolId poolId = key.toId();
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
         AuctionSlot0 slot0 = poolSlot0[poolId];
         address strategy = slot0.strategyAddress();
         uint24 fee = slot0.defaultSwapFee();
