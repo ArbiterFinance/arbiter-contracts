@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.19;
 
 import {HOOKS_BEFORE_INITIALIZE_OFFSET, HOOKS_AFTER_INITIALIZE_OFFSET, HOOKS_BEFORE_ADD_LIQUIDITY_OFFSET, HOOKS_AFTER_ADD_LIQUIDITY_OFFSET, HOOKS_BEFORE_REMOVE_LIQUIDITY_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDITY_OFFSET, HOOKS_BEFORE_SWAP_OFFSET, HOOKS_AFTER_SWAP_OFFSET, HOOKS_BEFORE_DONATE_OFFSET, HOOKS_AFTER_DONATE_OFFSET, HOOKS_BEFORE_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_SWAP_RETURNS_DELTA_OFFSET, HOOKS_AFTER_ADD_LIQUIDIY_RETURNS_DELTA_OFFSET, HOOKS_AFTER_REMOVE_LIQUIDIY_RETURNS_DELTA_OFFSET} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
 import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
@@ -11,12 +11,24 @@ import {ICLHooks} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
 import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {CLPoolManager} from "infinity-core/src/pool-cl/CLPoolManager.sol";
 
-contract CLBaseHook is ICLHooks {
+/// @notice BaseHook abstract contract for CL pool hooks to inherit
+abstract contract CLBaseHook is ICLHooks {
+    /// @notice The sender is not the pool manager
     error NotPoolManager();
+
+    /// @notice The sender is not the vault
     error NotVault();
+
+    /// @notice The sender is not this contract
     error NotSelf();
+
+    /// @notice The pool key does not include this hook
     error InvalidPool();
+
+    /// @notice The delegation of lockAcquired failed
     error LockFailure();
+
+    /// @notice The method is not implemented
     error HookNotImplemented();
 
     struct Permissions {
@@ -30,37 +42,10 @@ contract CLBaseHook is ICLHooks {
         bool afterSwap;
         bool beforeDonate;
         bool afterDonate;
-        bool beforeSwapReturnsDelta;
-        bool afterSwapReturnsDelta;
-        bool afterAddLiquidityReturnsDelta;
-        bool afterRemoveLiquidityReturnsDelta;
-    }
-
-    function getHooksRegistrationBitmap()
-        external
-        view
-        virtual
-        returns (uint16)
-    {
-        return
-            _hooksRegistrationBitmapFrom(
-                Permissions({
-                    beforeInitialize: false,
-                    afterInitialize: false,
-                    beforeAddLiquidity: false,
-                    afterAddLiquidity: false,
-                    beforeRemoveLiquidity: false,
-                    afterRemoveLiquidity: false,
-                    beforeSwap: false,
-                    afterSwap: false,
-                    beforeDonate: false,
-                    afterDonate: false,
-                    beforeSwapReturnsDelta: false,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
-                })
-            );
+        bool beforeSwapReturnDelta;
+        bool afterSwapReturnDelta;
+        bool afterAddLiquidityReturnDelta;
+        bool afterRemoveLiquidityReturnDelta;
     }
 
     /// @notice The address of the pool manager
@@ -98,8 +83,7 @@ contract CLBaseHook is ICLHooks {
         _;
     }
 
-    /// @dev Helper function when the hook needs to get a lock from the vault. See
-    ///      https://github.com/pancakeswap/infinity-hooks oh hooks which perform vault.lock()
+    /// @dev Delegate calls to corresponding methods according to callback data
     function lockAcquired(
         bytes calldata data
     ) external virtual vaultOnly returns (bytes memory) {
@@ -113,102 +97,230 @@ contract CLBaseHook is ICLHooks {
         }
     }
 
+    /// @inheritdoc ICLHooks
     function beforeInitialize(
+        address sender,
+        PoolKey calldata key,
+        uint160 sqrtPriceX96
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _beforeInitialize(sender, key, sqrtPriceX96);
+    }
+
+    function _beforeInitialize(
         address,
         PoolKey calldata,
         uint160
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function afterInitialize(
+        address sender,
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        int24 tick
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _afterInitialize(sender, key, sqrtPriceX96, tick);
+    }
+
+    function _afterInitialize(
         address,
         PoolKey calldata,
         uint160,
         int24
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function beforeAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _beforeAddLiquidity(sender, key, params, hookData);
+    }
+
+    function _beforeAddLiquidity(
         address,
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function afterAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4, BalanceDelta) {
+        return
+            _afterAddLiquidity(
+                sender,
+                key,
+                params,
+                delta,
+                feesAccrued,
+                hookData
+            );
+    }
+
+    function _afterAddLiquidity(
         address,
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external virtual returns (bytes4, BalanceDelta) {
+    ) internal virtual returns (bytes4, BalanceDelta) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function beforeRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _beforeRemoveLiquidity(sender, key, params, hookData);
+    }
+
+    function _beforeRemoveLiquidity(
         address,
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function afterRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4, BalanceDelta) {
+        return
+            _afterRemoveLiquidity(
+                sender,
+                key,
+                params,
+                delta,
+                feesAccrued,
+                hookData
+            );
+    }
+
+    function _afterRemoveLiquidity(
         address,
         PoolKey calldata,
         ICLPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta,
         BalanceDelta,
         bytes calldata
-    ) external virtual returns (bytes4, BalanceDelta) {
+    ) internal virtual poolManagerOnly returns (bytes4, BalanceDelta) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.SwapParams calldata params,
+        bytes calldata hookData
+    )
+        external
+        virtual
+        poolManagerOnly
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        return _beforeSwap(sender, key, params, hookData);
+    }
+
+    function _beforeSwap(
         address,
         PoolKey calldata,
         ICLPoolManager.SwapParams calldata,
         bytes calldata
-    ) external virtual returns (bytes4, BeforeSwapDelta, uint24) {
+    ) internal virtual returns (bytes4, BeforeSwapDelta, uint24) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        ICLPoolManager.SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4, int128) {
+        return _afterSwap(sender, key, params, delta, hookData);
+    }
+
+    function _afterSwap(
         address,
         PoolKey calldata,
         ICLPoolManager.SwapParams calldata,
         BalanceDelta,
         bytes calldata
-    ) external virtual returns (bytes4, int128) {
+    ) internal virtual returns (bytes4, int128) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function beforeDonate(
+        address sender,
+        PoolKey calldata key,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _beforeDonate(sender, key, amount0, amount1, hookData);
+    }
+
+    function _beforeDonate(
         address,
         PoolKey calldata,
         uint256,
         uint256,
         bytes calldata
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @inheritdoc ICLHooks
     function afterDonate(
+        address sender,
+        PoolKey calldata key,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata hookData
+    ) external virtual poolManagerOnly returns (bytes4) {
+        return _afterDonate(sender, key, amount0, amount1, hookData);
+    }
+
+    function _afterDonate(
         address,
         PoolKey calldata,
         uint256,
         uint256,
         bytes calldata
-    ) external virtual returns (bytes4) {
+    ) internal virtual returns (bytes4) {
         revert HookNotImplemented();
     }
 
+    /// @dev Helper function to construct the hook registration map
     function _hooksRegistrationBitmapFrom(
         Permissions memory permissions
     ) internal pure returns (uint16) {
@@ -261,22 +373,22 @@ contract CLBaseHook is ICLHooks {
                             : 0
                     ) |
                     (
-                        permissions.beforeSwapReturnsDelta
+                        permissions.beforeSwapReturnDelta
                             ? 1 << HOOKS_BEFORE_SWAP_RETURNS_DELTA_OFFSET
                             : 0
                     ) |
                     (
-                        permissions.afterSwapReturnsDelta
+                        permissions.afterSwapReturnDelta
                             ? 1 << HOOKS_AFTER_SWAP_RETURNS_DELTA_OFFSET
                             : 0
                     ) |
                     (
-                        permissions.afterAddLiquidityReturnsDelta
+                        permissions.afterAddLiquidityReturnDelta
                             ? 1 << HOOKS_AFTER_ADD_LIQUIDIY_RETURNS_DELTA_OFFSET
                             : 0
                     ) |
                     (
-                        permissions.afterRemoveLiquidityReturnsDelta
+                        permissions.afterRemoveLiquidityReturnDelta
                             ? 1 <<
                                 HOOKS_AFTER_REMOVE_LIQUIDIY_RETURNS_DELTA_OFFSET
                             : 0

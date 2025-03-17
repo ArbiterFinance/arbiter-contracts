@@ -68,10 +68,10 @@ contract NoOpRewardTracker is CLBaseHook, RewardTracker {
                     afterSwap: true,
                     beforeDonate: false,
                     afterDonate: false,
-                    beforeSwapReturnsDelta: false,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
+                    beforeSwapReturnDelta: false,
+                    afterSwapReturnDelta: false,
+                    afterAddLiquidityReturnDelta: false,
+                    afterRemoveLiquidityReturnDelta: false
                 })
             );
     }

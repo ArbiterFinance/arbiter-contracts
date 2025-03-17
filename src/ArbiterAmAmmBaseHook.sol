@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
-import {CLBaseHook} from "lib//CLBaseHook.sol";
+import {CLBaseHook} from "lib/CLBaseHook.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "infinity-core/src/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "infinity-core/src/types/Currency.sol";
 import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
@@ -132,10 +132,10 @@ abstract contract ArbiterAmAmmBaseHook is
                     afterSwap: false,
                     beforeDonate: false,
                     afterDonate: false,
-                    beforeSwapReturnsDelta: true,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
+                    beforeSwapReturnDelta: true,
+                    afterSwapReturnDelta: false,
+                    afterAddLiquidityReturnDelta: false,
+                    afterRemoveLiquidityReturnDelta: false
                 })
             );
     }
