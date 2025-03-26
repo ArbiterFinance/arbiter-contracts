@@ -275,4 +275,29 @@ abstract contract RewardTracker is IRewardTracker {
     ) external view override returns (uint256) {
         return pools[poolKey.toId()].getRewardsPerLiquidityCumulativeX128();
     }
+
+    function accrueRewards(PoolKey calldata poolKey, uint256 tokenId) external {
+        address owner = IERC721(address(positionManager)).ownerOf(tokenId);
+
+        (, CLPositionInfo positionInfo) = positionManager
+            .getPoolAndPositionInfo(tokenId);
+        uint128 positionLiquidity = positionManager.getPositionLiquidity(
+            tokenId
+        );
+
+        uint256 rewardsPerLiquidityCumulativeX128 = pools[poolKey.toId()]
+            .getRewardsPerLiquidityInsideX128(
+                positionInfo.tickLower(),
+                positionInfo.tickUpper()
+            );
+        _accrueRewards(
+            tokenId,
+            owner,
+            positionLiquidity,
+            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
+                positionInfo.tickLower(),
+                positionInfo.tickUpper()
+            )
+        );
+    }
 }

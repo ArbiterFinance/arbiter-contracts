@@ -21,4 +21,9 @@ interface IRewardTracker is ICLSubscriber {
         int24 tickLower,
         int24 tickUpper
     ) external view returns (uint256);
+
+    /// @notice Accrue rewards for a position
+    /// @param poolKey The key of the pool
+    /// @param tokenId The token ID of the position
+    function accrueRewards(PoolKey calldata poolKey, uint256 tokenId) external;
 }
