@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 /**
  * @dev AuctionSlot1 is a tightly packed data structure that holds multiple variables

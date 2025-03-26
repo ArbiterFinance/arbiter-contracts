@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 import {AuctionSlot1Library, AuctionSlot1} from "./AuctionSlot1.sol";
 

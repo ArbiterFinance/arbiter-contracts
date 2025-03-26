@@ -1,4 +1,4 @@
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 import {CommonBase} from "forge-std/Base.sol";
 import {MockInfinityRouter} from "infinity-periphery/test/mocks/MockInfinityRouter.sol";
