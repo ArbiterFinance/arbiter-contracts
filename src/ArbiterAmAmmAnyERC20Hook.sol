@@ -69,10 +69,10 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
                     afterSwap: true,
                     beforeDonate: false,
                     afterDonate: false,
-                    beforeSwapReturnsDelta: true,
-                    afterSwapReturnsDelta: false,
-                    afterAddLiquidityReturnsDelta: false,
-                    afterRemoveLiquidityReturnsDelta: false
+                    beforeSwapReturnDelta: true,
+                    afterSwapReturnDelta: false,
+                    afterAddLiquidityReturnDelta: false,
+                    afterRemoveLiquidityReturnDelta: false
                 })
             );
     }
