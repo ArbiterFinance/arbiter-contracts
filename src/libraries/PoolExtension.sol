@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 import {SafeCast} from "infinity-core/src/libraries/SafeCast.sol";
 import {TickBitmap} from "infinity-core/src/pool-cl/libraries/TickBitmap.sol";
@@ -99,7 +99,7 @@ library PoolExtension {
         State storage self,
         uint128 rewardsAmount
     ) internal {
-        if (self.liquidity == 0) return;
+        if (self.liquidity == 0) revert("DivByZero");
 
         self.rewardsPerLiquidityCumulativeX128 +=
             (uint256(rewardsAmount) << 128) /
@@ -158,6 +158,20 @@ library PoolExtension {
                 self.liquidity,
                 liquidityDelta
             );
+        }
+    }
+
+    function isInitialized(
+        State storage self,
+        int24 tick,
+        int24 tickSpacing
+    ) internal view returns (bool) {
+        unchecked {
+            if (tick % tickSpacing != 0) return false;
+            (int16 wordPos, uint8 bitPos) = TickBitmap.position(
+                tick / tickSpacing
+            );
+            return self.tickBitmap[wordPos] & (1 << bitPos) != 0;
         }
     }
 

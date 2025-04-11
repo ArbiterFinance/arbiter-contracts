@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2024 PancakeSwap
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 import {CommonBase} from "forge-std/Base.sol";
 import {Vm} from "forge-std/Vm.sol";

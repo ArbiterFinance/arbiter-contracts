@@ -52,6 +52,7 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
     function getHooksRegistrationBitmap()
         external
         pure
+        virtual
         override
         returns (uint16)
     {
@@ -68,10 +69,10 @@ contract ArbiterAmAmmAnyERC20Hook is ArbiterAmAmmBaseHook, RewardTracker {
                     afterSwap: true,
                     beforeDonate: false,
                     afterDonate: false,
-                    beforeSwapReturnDelta: true,
-                    afterSwapReturnDelta: false,
-                    afterAddLiquidityReturnDelta: false,
-                    afterRemoveLiquidityReturnDelta: false
+                    beforeSwapReturnsDelta: true,
+                    afterSwapReturnsDelta: false,
+                    afterAddLiquidityReturnsDelta: false,
+                    afterRemoveLiquidityReturnsDelta: false
                 })
             );
     }

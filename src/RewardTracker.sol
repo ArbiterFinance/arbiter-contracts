@@ -155,6 +155,7 @@ abstract contract RewardTracker is IRewardTracker {
     ) internal virtual;
 
     /// @inheritdoc ICLSubscriber
+    /// @notice that after subscribing the position should be unsubscribed before transferring - otherwise the rewards will be lost in favor of the new owner
     function notifySubscribe(
         uint256 tokenId,
         bytes memory
