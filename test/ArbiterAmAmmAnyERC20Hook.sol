@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
-import {ICLHooks} from "pancake-v4-core/src/pool-cl/interfaces/ICLHooks.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {ICLPositionManager} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
-import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
+import {Hooks} from "infinity-core/src/libraries/Hooks.sol";
+import {ICLHooks} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {ICLPositionManager} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
+import {PoolId, PoolIdLibrary} from "infinity-core/src/types/PoolId.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {Currency, CurrencyLibrary} from "infinity-core/src/types/Currency.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
-import {SafeCast} from "pancake-v4-core/src/libraries/SafeCast.sol";
-import {Constants} from "pancake-v4-core/test/pool-cl/helpers/Constants.sol";
-import {LiquidityAmounts} from "pancake-v4-core/test/pool-cl/helpers/LiquidityAmounts.sol";
-import {TickMath} from "pancake-v4-core/src/pool-cl/libraries/TickMath.sol";
-import {FullMath} from "pancake-v4-core/src/pool-cl/libraries/FullMath.sol";
-import {BalanceDelta, toBalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {CLPositionInfo, CLPositionInfoLibrary} from "pancake-v4-periphery/src/pool-cl/libraries/CLPositionInfoLibrary.sol";
+import {SafeCast} from "infinity-core/src/libraries/SafeCast.sol";
+import {Constants} from "infinity-core/test/pool-cl/helpers/Constants.sol";
+import {LiquidityAmounts} from "infinity-core/test/pool-cl/helpers/LiquidityAmounts.sol";
+import {TickMath} from "infinity-core/src/pool-cl/libraries/TickMath.sol";
+import {FullMath} from "infinity-core/src/pool-cl/libraries/FullMath.sol";
+import {BalanceDelta, toBalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
+import {CLPositionInfo, CLPositionInfoLibrary} from "infinity-periphery/src/pool-cl/libraries/CLPositionInfoLibrary.sol";
 import {RewardTracker} from "../src/RewardTracker.sol";
 import {PoolExtension} from "../src/libraries/PoolExtension.sol";
 import {PositionExtension} from "../src/libraries/PositionExtension.sol";
@@ -28,11 +28,11 @@ import {MockCLSwapRouter} from "./pool-cl/helpers/MockCLSwapRouter.sol";
 import {IArbiterFeeProvider} from "../src/interfaces/IArbiterFeeProvider.sol";
 import {AuctionSlot0, AuctionSlot0Library} from "../src/types/AuctionSlot0.sol";
 import {AuctionSlot1, AuctionSlot1Library} from "../src/types/AuctionSlot1.sol";
-import {ICLRouterBase} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {IPoolManager} from "pancake-v4-core/src/interfaces/IPoolManager.sol";
-import {IHooks} from "pancake-v4-core/src/interfaces/IHooks.sol";
-import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {ICLRouterBase} from "infinity-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
+import {IPoolManager} from "infinity-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "infinity-core/src/interfaces/IHooks.sol";
+import {CLPoolParametersHelper} from "infinity-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 
 import {AuctionSlot0, AuctionSlot0Library} from "../src/types/AuctionSlot0.sol";
 import {AuctionSlot1, AuctionSlot1Library} from "../src/types/AuctionSlot1.sol";
@@ -250,8 +250,14 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
 
         (, int24 tick, , ) = poolManager.getSlot0(key.toId());
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(poolId);
 
         assertEq(tick, 5, "Tick should be 5");
+        assertEq(
+            tick,
+            slot0.lastActiveTick(),
+            "Tick should be last active tick"
+        );
         IERC20(Currency.unwrap(currency1)).approve(
             address(swapRouter),
             1 ether
@@ -268,8 +274,14 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
         );
 
         (, int24 tick2, , ) = poolManager.getSlot0(key.toId());
+        slot0 = arbiterHook.poolSlot0(poolId);
 
         assertGt(tick2, 5, "Tick should be greater than 5");
+        assertEq(
+            tick2,
+            slot0.lastActiveTick(),
+            "Tick should be last active tick"
+        );
 
         uint256 rewardsPerLiquidityInsideX128After = arbiterHook
             .getRewardsPerLiquidityInsideX128(key, tickLower, tickUpper);
@@ -556,7 +568,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -639,7 +651,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,

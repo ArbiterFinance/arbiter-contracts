@@ -1,22 +1,22 @@
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 import {CommonBase} from "forge-std/Base.sol";
-import {MockV4Router} from "pancake-v4-periphery/test/mocks/MockV4Router.sol";
-import {IV4Router} from "pancake-v4-periphery/src/interfaces/IV4Router.sol";
-import {IVault} from "pancake-v4-core/src/interfaces/IVault.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {IBinPoolManager} from "pancake-v4-core/src/pool-bin/interfaces/IBinPoolManager.sol";
-import {Planner, Plan} from "pancake-v4-periphery/src/libraries/Planner.sol";
-import {Actions} from "pancake-v4-periphery/src/libraries/Actions.sol";
-import {Currency} from "pancake-v4-core/src/types/Currency.sol";
+import {MockInfinityRouter} from "infinity-periphery/test/mocks/MockInfinityRouter.sol";
+import {IInfinityRouter} from "infinity-periphery/src/interfaces/IInfinityRouter.sol";
+import {IVault} from "infinity-core/src/interfaces/IVault.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {IBinPoolManager} from "infinity-core/src/pool-bin/interfaces/IBinPoolManager.sol";
+import {Planner, Plan} from "infinity-periphery/src/libraries/Planner.sol";
+import {Actions} from "infinity-periphery/src/libraries/Actions.sol";
+import {Currency} from "infinity-core/src/types/Currency.sol";
 
-contract MockCLSwapRouter is MockV4Router, CommonBase {
+contract MockCLSwapRouter is MockInfinityRouter, CommonBase {
     using Planner for Plan;
 
     constructor(
         IVault _vault,
         ICLPoolManager _clPoolManager
-    ) MockV4Router(_vault, _clPoolManager, IBinPoolManager(address(0))) {}
+    ) MockInfinityRouter(_vault, _clPoolManager, IBinPoolManager(address(0))) {}
 
     modifier checkDeadline(uint256 deadline) {
         if (block.timestamp > deadline) revert();
@@ -24,7 +24,7 @@ contract MockCLSwapRouter is MockV4Router, CommonBase {
     }
 
     function exactInputSingle(
-        IV4Router.CLSwapExactInputSingleParams calldata params,
+        IInfinityRouter.CLSwapExactInputSingleParams calldata params,
         uint256 deadline
     ) external payable checkDeadline(deadline) {
         Plan memory planner = Planner.init().add(
@@ -48,7 +48,7 @@ contract MockCLSwapRouter is MockV4Router, CommonBase {
     }
 
     function exactInput(
-        IV4Router.CLSwapExactInputParams calldata params,
+        IInfinityRouter.CLSwapExactInputParams calldata params,
         uint256 deadline
     ) external payable checkDeadline(deadline) {
         Plan memory planner = Planner.init().add(
@@ -70,7 +70,7 @@ contract MockCLSwapRouter is MockV4Router, CommonBase {
     }
 
     function exactOutputSingle(
-        IV4Router.CLSwapExactOutputSingleParams calldata params,
+        IInfinityRouter.CLSwapExactOutputSingleParams calldata params,
         uint256 deadline
     ) external payable checkDeadline(deadline) {
         Plan memory planner = Planner.init().add(
@@ -94,7 +94,7 @@ contract MockCLSwapRouter is MockV4Router, CommonBase {
     }
 
     function exactOutput(
-        IV4Router.CLSwapExactOutputParams calldata params,
+        IInfinityRouter.CLSwapExactOutputParams calldata params,
         uint256 deadline
     ) external payable checkDeadline(deadline) {
         Plan memory planner = Planner.init().add(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.26;
 
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
 import {IArbiterFeeProvider} from "./IArbiterFeeProvider.sol";
 
 interface IArbiterAmmStrategy is IArbiterFeeProvider {

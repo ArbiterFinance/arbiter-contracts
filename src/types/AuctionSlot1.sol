@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 /**
- * @dev AuctionSlot1 is a tightly packed data structure that holds multiple parameters
- * related to the auction's financial state and configuration.
+ * @dev AuctionSlot1 is a tightly packed data structure that holds multiple variables
+ * related to the rent state that change over time.
  *
  * - [0..128): `remaining rent` (128 bits) - The amount of rent that is still owed for the current rent period.
  * - [128..160): `last paid block` (32 bits) - The block number of the last block when rent was paid.
@@ -17,7 +17,7 @@ using AuctionSlot1Library for AuctionSlot1 global;
 library AuctionSlot1Library {
     uint128 internal constant MASK_128_BITS =
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    uint96 internal constant MASK_96_BITS = 0xFFFFFFFFFFFFFFFFFFFF;
+    uint96 internal constant MASK_96_BITS = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
     uint32 internal constant MASK_32_BITS = 0xFFFFFFFF;
 
     uint8 internal constant LAST_PAID_BLOCK_OFFSET = 128;

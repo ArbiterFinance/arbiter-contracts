@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
 import {AuctionSlot1Library, AuctionSlot1} from "./AuctionSlot1.sol";
 
 /**
- * @dev AuctionSlot0 is a tightly packed data structure that holds multiple parameters
+ * @dev AuctionSlot0 is a tightly packed data structure that holds parameters & variables
  * related to the auction's configuration and state.
  *
  * - [0..160): `strategy address` (160 bits) - The address of the current strategy contract.
  * - [160..184): `last active tick` (24 bits) - The tick at which the auction was last active.
- * - [184..185): `should change strategy` (8 bits) - A boolean flag indicating whether a new strategy should be applied.
- * - [185..208): `winner fee part` (16 bits) - The portion of the fee paid to the auction winner, expressed in basis points.
+ * - [184..185): `should change strategy` (1 bit) - A boolean flag indicating whether a new strategy should be applied.
+ * - [185..208): `winner fee part` (23 bits) - The portion of the fee paid to the auction winner, expressed in basis points.
  * - [208..216): `strategy gas limit` (8 bits) - The maximum gas allocation for executing the strategy.
  * - [216..232): `default swap fee` (16 bits) - The default fee applied to swaps in basis points.
  * - [232..256): `auction fee` (24 bits) - The auction fee applied to the winning bid

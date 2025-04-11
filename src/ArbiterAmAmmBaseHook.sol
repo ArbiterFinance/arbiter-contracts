@@ -1,25 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
-import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
+import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
 import {CLBaseHook} from "lib//CLBaseHook.sol";
-import {BeforeSwapDelta, toBeforeSwapDelta} from "pancake-v4-core/src/types/BeforeSwapDelta.sol";
-import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {BeforeSwapDelta, toBeforeSwapDelta} from "infinity-core/src/types/BeforeSwapDelta.sol";
+import {Currency, CurrencyLibrary} from "infinity-core/src/types/Currency.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
+import {PoolId, PoolIdLibrary} from "infinity-core/src/types/PoolId.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {IArbiterFeeProvider} from "./interfaces/IArbiterFeeProvider.sol";
 import {AuctionSlot0, AuctionSlot0Library} from "./types/AuctionSlot0.sol";
 import {AuctionSlot1, AuctionSlot1Library} from "./types/AuctionSlot1.sol";
 
 import {IArbiterAmAmmHarbergerLease} from "./interfaces/IArbiterAmAmmHarbergerLease.sol";
-import {Ownable2Step} from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-
-// TODO decide on the blockNumber storage size uint32 / uint48 / uint64
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
 /// It allows anyone to bid for the right to collect and set trading fees for a pool after depositing the rent currency of the pool.
@@ -38,12 +36,28 @@ abstract contract ArbiterAmAmmBaseHook is
     using AuctionSlot0Library for AuctionSlot0;
     using AuctionSlot1Library for AuctionSlot1;
 
+    /// @dev Returned when mimum rent blocks is attempted to be set to zero.
+    error MinimumRentBlocksZero();
+
+    enum CallbackAction {
+        DEPOSIT_OR_WITHDRAW,
+        PAY_RENT_AND_CHANGE_STRATEGY
+    }
     /// @notice Data passed to `vault.unlock` when distributing rent to LPs.
-    struct CallbackData {
+    struct DepositOrWithdrawCallbackPayload {
         address currency;
         address sender;
         uint256 depositAmount;
         uint256 withdrawAmount;
+    }
+
+    struct PayRentAndChangeStrategyCallbackPayload {
+        PoolKey key;
+    }
+
+    struct CallbackData {
+        CallbackAction action;
+        bytes data;
     }
 
     uint32 internal _transitionBlocks = 30;
@@ -54,16 +68,37 @@ abstract contract ArbiterAmAmmBaseHook is
     uint8 internal _defaultStrategyGasLimit = 13;
     uint16 internal _defaultSwapFee = 4e2; // 0.04%
 
+    /// @notice Mapping of the PoolId to the auction's configuration and state.
+    /// @dev Key is the PoolId, value is the AuctionSlot0 struct
     mapping(PoolId => AuctionSlot0) public poolSlot0;
+
+    /// @notice Mapping of the PoolId to the currently active rent state.
+    /// @dev Key is the PoolId, value is the AuctionSlot1 struct
     mapping(PoolId => AuctionSlot1) public poolSlot1;
+
+    /// @notice Mapping of the PoolId to the address of the current winner.
+    /// @dev Key is the PoolId, value is the address of the winner
     mapping(PoolId => address) public winners;
+
+    /// @notice Mapping of the PoolId to the address of the current winner's strategy contract.
+    /// @dev Key is the PoolId, value is the address of the winner's strategy contract.
     mapping(PoolId => address) public winnerStrategies;
+
+    /// @notice Mapping of the user's address to deposits of rent currencies.
+    /// @dev Key is the user's address, value is a mapping of the currency to the deposit amount.
     mapping(address => mapping(Currency => uint256)) public deposits;
+
+    /// @notice Mapping of the PoolId to the auction fee state.
+    /// @dev Key is the PoolId, value is the AuctionFee struct
     mapping(PoolId => AuctionFee) public auctionFees;
 
+    /// @notice Struct to hold the auction fee state.
     struct AuctionFee {
+        /// @notice The initial remaining rent amount when the auction fee was locked.
         uint128 initialRemainingRent;
+        /// @notice The amount of rent that is locked as the auction fee.
         uint128 feeLocked;
+        /// @notice The amount of fees collected from the auction.
         uint128 collectedFee;
     }
 
@@ -87,14 +122,14 @@ abstract contract ArbiterAmAmmBaseHook is
         return
             _hooksRegistrationBitmapFrom(
                 Permissions({
-                    beforeInitialize: true,
-                    afterInitialize: false,
+                    beforeInitialize: false,
+                    afterInitialize: true,
                     beforeAddLiquidity: true,
                     beforeRemoveLiquidity: false,
                     afterAddLiquidity: false,
                     afterRemoveLiquidity: false,
                     beforeSwap: true,
-                    afterSwap: true,
+                    afterSwap: false,
                     beforeDonate: false,
                     afterDonate: false,
                     beforeSwapReturnsDelta: true,
@@ -106,16 +141,15 @@ abstract contract ArbiterAmAmmBaseHook is
     }
 
     /// @dev Reverts if dynamic fee flag is not set or if the pool is not initialized with dynamic fees.
-    function beforeInitialize(
+    function afterInitialize(
         address,
         PoolKey calldata key,
-        uint160
+        uint160,
+        int24 tick
     ) external virtual override poolManagerOnly returns (bytes4) {
         // Pool must have dynamic fee flag set. This is so we can override the LP fee in `beforeSwap`.
         if (!key.fee.isDynamicLPFee()) revert NotDynamicFee();
         PoolId poolId = key.toId();
-
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
 
         poolSlot0[poolId] = AuctionSlot0
             .wrap(bytes32(0))
@@ -125,7 +159,7 @@ abstract contract ArbiterAmAmmBaseHook is
             .setAuctionFee(_defaultAuctionFee)
             .setLastActiveTick(tick);
 
-        return this.beforeInitialize.selector;
+        return this.afterInitialize.selector;
     }
 
     /// @notice Distributes rent to LPs before each liquidity change.
@@ -135,7 +169,7 @@ abstract contract ArbiterAmAmmBaseHook is
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual override poolManagerOnly returns (bytes4) {
-        _payRentAndChangeStrategyIfNeeded(key);
+        _payRentAndChangeStrategyWhenLocked(key);
         return this.beforeAddLiquidity.selector;
     }
 
@@ -154,9 +188,8 @@ abstract contract ArbiterAmAmmBaseHook is
         returns (bytes4, BeforeSwapDelta, uint24)
     {
         PoolId poolId = key.toId();
+        _payRentAndChangeStrategyWhenLocked(key);
         AuctionSlot0 slot0 = poolSlot0[poolId];
-        slot0 = _changeStrategyIfNeeded(slot0, poolId);
-        poolSlot0[poolId] = slot0;
         address strategy = slot0.strategyAddress();
         uint24 fee = slot0.defaultSwapFee();
         // If no strategy is set, the swap fee is just set to the default value
@@ -191,11 +224,11 @@ abstract contract ArbiterAmAmmBaseHook is
 
         uint256 lpFee = absTotalFees - strategyFee;
 
-        // Determine the specified currency. If amountSpecified < 0, the swap is exact-in so the feeCurrency should be the token the swapper is selling.
-        // If amountSpecified > 0, the swap is exact-out and it's the bought token.
+        // Determine the fee currency based on the swap type.
+        // The fee is always charged in the token that the swapper is receiving (the bought token).
         bool exactOut = params.amountSpecified > 0;
 
-        bool isFeeCurrency0 = exactOut == params.zeroForOne;
+        bool isFeeCurrency0 = !exactOut == params.zeroForOne;
 
         // Send fees to strategy
         vault.mint(
@@ -213,28 +246,10 @@ abstract contract ArbiterAmAmmBaseHook is
         return (
             this.beforeSwap.selector,
             exactOut
-                ? toBeforeSwapDelta(0, int128(totalFees))
-                : toBeforeSwapDelta(0, -int128(totalFees)),
+                ? toBeforeSwapDelta(int128(totalFees), 0)
+                : toBeforeSwapDelta(-int128(totalFees), 0),
             LPFeeLibrary.OVERRIDE_FEE_FLAG
         );
-    }
-
-    function afterSwap(
-        address,
-        PoolKey calldata key,
-        ICLPoolManager.SwapParams calldata,
-        BalanceDelta,
-        bytes calldata
-    ) external virtual override poolManagerOnly returns (bytes4, int128) {
-        PoolId poolId = key.toId();
-        (, int24 tick, , ) = poolManager.getSlot0(poolId);
-
-        AuctionSlot0 slot0 = poolSlot0[poolId];
-        if (tick != slot0.lastActiveTick()) {
-            _payRentAndChangeStrategyIfNeeded(key);
-        }
-
-        return (this.afterSwap.selector, 0);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -325,7 +340,21 @@ abstract contract ArbiterAmAmmBaseHook is
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function deposit(address asset, uint256 amount) external override {
         // Deposit 6909 claim tokens to Pancake V4 Vault. The claim tokens are owned by this contract.
-        vault.lock(abi.encode(CallbackData(asset, msg.sender, amount, 0)));
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            asset,
+                            msg.sender,
+                            amount,
+                            0
+                        )
+                    )
+                )
+            )
+        );
         deposits[msg.sender][Currency.wrap(asset)] += amount;
 
         emit Deposit(msg.sender, asset, amount);
@@ -348,19 +377,33 @@ abstract contract ArbiterAmAmmBaseHook is
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
         unchecked {
+            // minimumEndBlock can overflow
             uint32 minimumEndBlock = uint32(block.number) + _minRentBlocks;
-            require(
-                rentEndBlock >= minimumEndBlock ||
-                    rentEndBlock < uint32(block.number),
-                RentTooShort()
-            );
+            // if minimumEndBlock does not overflow,
+            if (minimumEndBlock > uint32(block.number)) {
+                require(
+                    rentEndBlock >= minimumEndBlock ||
+                        rentEndBlock < uint32(block.number),
+                    RentTooShort()
+                );
+            }
+            // minimumEndBlock overflowed
+            else {
+                require(
+                    rentEndBlock >= minimumEndBlock &&
+                        rentEndBlock < uint32(block.number),
+                    RentTooShort()
+                );
+            }
         }
 
-        uint64 _currentRentEndBlock = slot1.rentEndBlock();
+        uint256 _currentRentEndBlock = slot1.rentEndBlock();
 
         unchecked {
+            /// If we are not in the transition period, the rentPerBlock must be higher than the previous rentPerBlock
             if (
-                uint256(uint32(block.number)) + _transitionBlocks <
+                // using uint256 to avoid overflow
+                uint256(uint32(block.number)) + uint256(_transitionBlocks) <
                 _currentRentEndBlock
             ) {
                 uint120 minimumRentPerBlock = uint120(slot1.rentPerBlock()) +
@@ -372,9 +415,10 @@ abstract contract ArbiterAmAmmBaseHook is
             }
         }
 
-        _payRentAndChangeStrategyIfNeeded(key);
-
+        _payRentAndChangeStrategyWhenNotLocked(key);
         Currency currency = _getPoolRentCurrency(key);
+
+        slot1 = poolSlot1[poolId];
 
         // refund the remaining rentPerBlock to the previous winner
         uint128 remainingRent = slot1.remainingRent();
@@ -390,11 +434,18 @@ abstract contract ArbiterAmAmmBaseHook is
             deposits[winners[poolId]][currency] +=
                 slot1.remainingRent() +
                 feeRefund;
-            auctionFees[poolId] = AuctionFee(0, 0, collectedFee);
+            auctionFees[poolId] = AuctionFee(
+                0,
+                0,
+                auctionFees[poolId].collectedFee + collectedFee
+            );
         }
 
         // charge the new winner
-        uint64 rentBlockLength = rentEndBlock - uint64(block.number);
+        uint32 rentBlockLength;
+        unchecked {
+            rentBlockLength = rentEndBlock - uint32(block.number);
+        }
         uint128 totalRent = rentPerBlock * rentBlockLength;
         uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
@@ -435,19 +486,40 @@ abstract contract ArbiterAmAmmBaseHook is
             deposits[msg.sender][Currency.wrap(asset)] = depositAmount - amount;
         }
         // Withdraw 6909 claim tokens from vault
-        vault.lock(abi.encode(CallbackData(asset, msg.sender, 0, amount)));
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            asset,
+                            msg.sender,
+                            0,
+                            amount
+                        )
+                    )
+                )
+            )
+        );
 
         emit Withdraw(msg.sender, asset, amount);
     }
+
+    function _payRentAndChangeStrategyWhenNotLocked(
+        PoolKey memory key
+    ) internal virtual;
 
     /// @inheritdoc IArbiterAmAmmHarbergerLease
     function changeStrategy(
         PoolKey calldata key,
         address strategy
     ) external override {
+        _payRentAndChangeStrategyWhenNotLocked(key);
+
         PoolId poolId = key.toId();
         if (
             msg.sender != winners[poolId] ||
+            msg.sender == address(0) ||
             poolSlot1[key.toId()].remainingRent() == 0
         ) {
             revert CallerNotWinner();
@@ -455,7 +527,7 @@ abstract contract ArbiterAmAmmBaseHook is
         winnerStrategies[poolId] = strategy;
         poolSlot0[poolId].setShouldChangeStrategy(true);
 
-        emit ChangeStrategy(poolId, strategy);
+        emit StrategyChanged(poolId, strategy);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -466,27 +538,41 @@ abstract contract ArbiterAmAmmBaseHook is
     function lockAcquired(
         bytes calldata rawData
     ) external override vaultOnly returns (bytes memory) {
-        CallbackData memory data = abi.decode(rawData, (CallbackData));
-        Currency currencyWrapped = Currency.wrap(data.currency);
+        CallbackData memory cbData = abi.decode(rawData, (CallbackData));
 
-        if (data.depositAmount > 0) {
-            vault.sync(Currency.wrap(data.currency));
-            // Transfer tokens directly from msg.sender to the vault
-            IERC20(data.currency).transferFrom(
-                data.sender,
-                address(vault),
-                data.depositAmount
+        if (cbData.action == CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY) {
+            PayRentAndChangeStrategyCallbackPayload memory data = abi.decode(
+                cbData.data,
+                (PayRentAndChangeStrategyCallbackPayload)
             );
-            vault.mint(address(this), currencyWrapped, data.depositAmount);
-            vault.settle();
-        }
-        if (data.withdrawAmount > 0) {
-            vault.burn(address(this), currencyWrapped, data.withdrawAmount);
-            vault.mint(data.sender, currencyWrapped, data.withdrawAmount);
-            vault.settle();
-        }
+            _payRentAndChangeStrategyWhenLocked(data.key);
+            return "";
+        } else {
+            DepositOrWithdrawCallbackPayload memory data = abi.decode(
+                cbData.data,
+                (DepositOrWithdrawCallbackPayload)
+            );
+            Currency currencyWrapped = Currency.wrap(data.currency);
 
-        return "";
+            if (data.depositAmount > 0) {
+                vault.sync(Currency.wrap(data.currency));
+                // Transfer tokens directly from msg.sender to the vault
+                IERC20(data.currency).transferFrom(
+                    data.sender,
+                    address(vault),
+                    data.depositAmount
+                );
+                vault.mint(address(this), currencyWrapped, data.depositAmount);
+                vault.settle();
+            }
+            if (data.withdrawAmount > 0) {
+                vault.burn(address(this), currencyWrapped, data.withdrawAmount);
+                vault.mint(data.sender, currencyWrapped, data.withdrawAmount);
+                vault.settle();
+            }
+
+            return "";
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -507,7 +593,7 @@ abstract contract ArbiterAmAmmBaseHook is
         return slot0;
     }
 
-    function _payRentAndChangeStrategyIfNeeded(PoolKey memory key) internal {
+    function _payRentAndChangeStrategyWhenLocked(PoolKey memory key) internal {
         PoolId poolId = key.toId();
         AuctionSlot1 slot1 = poolSlot1[poolId];
 
@@ -533,7 +619,7 @@ abstract contract ArbiterAmAmmBaseHook is
 
         uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
 
-        if (rentAmount > remainingRent) {
+        if (rentAmount >= remainingRent) {
             // pay the remainingRent and reset the auction - no winner
             rentAmount = remainingRent;
             winners[poolId] = address(0);
@@ -552,8 +638,6 @@ abstract contract ArbiterAmAmmBaseHook is
 
         poolSlot1[poolId] = slot1;
         poolSlot0[poolId] = slot0;
-
-        return;
     }
 
     function _distributeRent(
@@ -571,14 +655,18 @@ abstract contract ArbiterAmAmmBaseHook is
 
     function setTransitionBlocks(uint32 transitionBlocks_) external onlyOwner {
         _transitionBlocks = transitionBlocks_;
+        emit TransitionBlocksSet(transitionBlocks_);
     }
 
     function setMinRentBlocks(uint32 minRentBlocks_) external onlyOwner {
+        require(minRentBlocks_ > 0, MinimumRentBlocksZero());
         _minRentBlocks = minRentBlocks_;
+        emit MinRentBlocksSet(minRentBlocks_);
     }
 
     function setOverbidFactor(uint24 overbidFactor_) external onlyOwner {
         _overbidFactor = overbidFactor_;
+        emit OverbidFactorSet(overbidFactor_);
     }
 
     function setWinnerFeeSharePart(
@@ -588,6 +676,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setWinnerFeeSharePart(
             winnerFeeSharePart
         );
+        emit WinnerFeeSharePartSet(key.toId(), winnerFeeSharePart);
     }
 
     function setStrategyGasLimit(
@@ -597,6 +686,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setStrategyGasLimit(
             strategyGasLimit
         );
+        emit StrategyGasLimitSet(key.toId(), strategyGasLimit);
     }
 
     function setDefaultSwapFee(
@@ -606,6 +696,7 @@ abstract contract ArbiterAmAmmBaseHook is
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setDefaultSwapFee(
             defaultSwapFee
         );
+        emit DefaultSwapFeeSet(key.toId(), defaultSwapFee);
     }
 
     function setAuctionFee(
@@ -613,6 +704,7 @@ abstract contract ArbiterAmAmmBaseHook is
         uint24 auctionFee
     ) external onlyOwner {
         poolSlot0[key.toId()] = poolSlot0[key.toId()].setAuctionFee(auctionFee);
+        emit AuctionFeeSet(key.toId(), auctionFee);
     }
 
     function collectAuctionFees(
@@ -622,14 +714,18 @@ abstract contract ArbiterAmAmmBaseHook is
         PoolId poolId = key.toId();
         uint128 collectedFee = auctionFees[poolId].collectedFee;
         auctionFees[poolId].collectedFee = 0;
-
         vault.lock(
             abi.encode(
                 CallbackData(
-                    Currency.unwrap(_getPoolRentCurrency(key)),
-                    to,
-                    0,
-                    collectedFee
+                    CallbackAction.DEPOSIT_OR_WITHDRAW,
+                    abi.encode(
+                        DepositOrWithdrawCallbackPayload(
+                            Currency.unwrap(_getPoolRentCurrency(key)),
+                            to,
+                            0,
+                            collectedFee
+                        )
+                    )
                 )
             )
         );

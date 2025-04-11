@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity 0.8.26;
 
-import {SafeCast} from "pancake-v4-core/src/libraries/SafeCast.sol";
-import {TickBitmap} from "pancake-v4-core/src/pool-cl/libraries/TickBitmap.sol";
-import {ProtocolFeeLibrary} from "pancake-v4-core/src/libraries/ProtocolFeeLibrary.sol";
-import {LiquidityMath} from "pancake-v4-core/src/pool-cl/libraries/LiquidityMath.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
+import {SafeCast} from "infinity-core/src/libraries/SafeCast.sol";
+import {TickBitmap} from "infinity-core/src/pool-cl/libraries/TickBitmap.sol";
+import {ProtocolFeeLibrary} from "infinity-core/src/libraries/ProtocolFeeLibrary.sol";
+import {LiquidityMath} from "infinity-core/src/pool-cl/libraries/LiquidityMath.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
 
 /// @notice a library that records staked/subscribed liquiduty and allows for the calculation of
 ///         the rewards per liquidity of a position
@@ -16,23 +16,30 @@ library PoolExtension {
     using ProtocolFeeLibrary for *;
     using LPFeeLibrary for uint24;
 
-    // info stored for each initialized individual tick
+    /// @notice info stored for each initialized individual tick
     struct TickInfo {
-        // the total position liquidity that references this tick
+        /// @notice the total position liquidity that references this tick
         uint128 liquidityGross;
-        // amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
+        /// @notice amount of net liquidity added (subtracted) when tick is crossed from left to right (right to left),
         int128 liquidityNet;
-        // the rewards per unit of liquidity on the _other_ side of this tick (relative to the current tick)
-        // only has relative meaning, not absolute — the value depends on when the tick is initialized
+        /// @notice the rewards per unit of liquidity on the _other_ side of this tick (relative to the current tick)
+        /// @notice only has relative meaning, not absolute — the value depends on when the tick is initialized
         uint256 rewardsPerLiquidityOutsideX128;
     }
 
-    /// @dev The state of a pool extension
+    /// @notice Stores necessary info to track rewards per liquidity across ticks
     struct State {
+        /// @notice rewards per liquidity of the pool
         uint256 rewardsPerLiquidityCumulativeX128;
+        /// @notice the total liquidity of the pool participating in rewards
         uint128 liquidity;
+        /// @notice the current tick
         int24 tick;
+        /// @notice the tick info for each initialized tick
+        /// @dev Key is the tick, value is the TickInfo struct
         mapping(int24 tick => TickInfo) ticks;
+        /// @notice the tick bitmap used to efficiently find initialized ticks & flip
+        /// @dev Key is the word position, value is the word
         mapping(int16 wordPos => uint256) tickBitmap;
     }
 
@@ -47,12 +54,12 @@ library PoolExtension {
             if (self.tick < tickLower) {
                 return
                     self.ticks[tickLower].rewardsPerLiquidityOutsideX128 -
-                    self.rewardsPerLiquidityCumulativeX128;
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128;
             }
             if (self.tick >= tickUpper) {
                 return
-                    self.rewardsPerLiquidityCumulativeX128 -
-                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128;
+                    self.ticks[tickUpper].rewardsPerLiquidityOutsideX128 -
+                    self.ticks[tickLower].rewardsPerLiquidityOutsideX128;
             }
             return
                 self.rewardsPerLiquidityCumulativeX128 -
@@ -92,6 +99,8 @@ library PoolExtension {
         State storage self,
         uint128 rewardsAmount
     ) internal {
+        if (self.liquidity == 0) revert("DivByZero");
+
         self.rewardsPerLiquidityCumulativeX128 +=
             (uint256(rewardsAmount) << 128) /
             self.liquidity;
@@ -144,7 +153,7 @@ library PoolExtension {
         }
 
         // update the active liquidity
-        if (params.tickLower < self.tick && self.tick < params.tickUpper) {
+        if (params.tickLower <= self.tick && self.tick < params.tickUpper) {
             self.liquidity = LiquidityMath.addDelta(
                 self.liquidity,
                 liquidityDelta
@@ -152,47 +161,84 @@ library PoolExtension {
         }
     }
 
-    function crossToActiveTick(
+    function isInitialized(
+        State storage self,
+        int24 tick,
+        int24 tickSpacing
+    ) internal view returns (bool) {
+        unchecked {
+            if (tick % tickSpacing != 0) return false;
+            (int16 wordPos, uint8 bitPos) = TickBitmap.position(
+                tick / tickSpacing
+            );
+            return self.tickBitmap[wordPos] & (1 << bitPos) != 0;
+        }
+    }
+
+    function crossToTargetTick(
         State storage self,
         int24 tickSpacing,
-        int24 activeTick
+        int24 targetTick
     ) internal {
         // initialize to the current tick
         int24 currentTick = self.tick;
         // initialize to the current liquidity
         int128 liquidityChange = 0;
 
-        //eq to zeroForOne
-        bool goingLeft = activeTick <= currentTick;
+        bool lte = targetTick <= currentTick;
 
-        while ((activeTick < currentTick) == goingLeft) {
-            (int24 nextTick, ) = self
-                .tickBitmap
-                .nextInitializedTickWithinOneWord(
-                    currentTick,
-                    tickSpacing,
-                    goingLeft
-                );
+        if (lte) {
+            while (targetTick < currentTick) {
+                (int24 nextTick, bool initialized) = self
+                    .tickBitmap
+                    .nextInitializedTickWithinOneWord(
+                        currentTick,
+                        tickSpacing,
+                        true
+                    );
 
-            int128 liquidityNet = PoolExtension.crossTick(
-                self,
-                currentTick,
-                self.rewardsPerLiquidityCumulativeX128
-            );
+                if (nextTick <= targetTick) {
+                    break;
+                }
 
-            // if we're moving leftward, we interpret liquidityNet as the opposite sign
-            // safe because liquidityNet cannot be type(int128).min
-            unchecked {
-                if (goingLeft) liquidityNet = -liquidityNet;
+                if (initialized) {
+                    int128 liquidityNet = -PoolExtension.crossTick(
+                        self,
+                        nextTick,
+                        self.rewardsPerLiquidityCumulativeX128
+                    );
+                    liquidityChange += liquidityNet;
+                }
+                currentTick = nextTick - 1;
             }
+        } else {
+            // going right
+            while (currentTick < targetTick) {
+                (int24 nextTick, bool initialized) = self
+                    .tickBitmap
+                    .nextInitializedTickWithinOneWord(
+                        currentTick,
+                        tickSpacing,
+                        false
+                    );
 
-            unchecked {
-                currentTick = goingLeft ? nextTick - 1 : nextTick;
+                if (nextTick > targetTick) {
+                    break;
+                }
+
+                if (initialized) {
+                    int128 liquidityNet = PoolExtension.crossTick(
+                        self,
+                        nextTick,
+                        self.rewardsPerLiquidityCumulativeX128
+                    );
+                    liquidityChange += liquidityNet;
+                }
+                currentTick = nextTick;
             }
-            liquidityChange += liquidityNet;
         }
 
-        self.tick = activeTick;
+        self.tick = targetTick;
 
         self.liquidity = LiquidityMath.addDelta(
             self.liquidity,
@@ -275,6 +321,11 @@ library PoolExtension {
     ) internal returns (int128 liquidityNet) {
         unchecked {
             TickInfo storage info = self.ticks[tick];
+
+            if (info.liquidityGross == 0) {
+                return 0;
+            }
+
             info.rewardsPerLiquidityOutsideX128 =
                 rewardsPerLiquidityCumulativeX128 -
                 info.rewardsPerLiquidityOutsideX128;

@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
-import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {ICLPositionManager} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
-import {CLPositionInfo, CLPositionInfoLibrary} from "pancake-v4-periphery/src/pool-cl/libraries/CLPositionInfoLibrary.sol";
-import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {ICLSubscriber} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLSubscriber.sol";
+import {Hooks} from "infinity-core/src/libraries/Hooks.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {ICLPositionManager} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionManager.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "infinity-core/src/types/PoolId.sol";
+import {CLPositionInfo, CLPositionInfoLibrary} from "infinity-periphery/src/pool-cl/libraries/CLPositionInfoLibrary.sol";
+import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
+import {ICLSubscriber} from "infinity-periphery/src/pool-cl/interfaces/ICLSubscriber.sol";
 
 import {IRewardTracker} from "./interfaces/IRewardTracker.sol";
 import {PoolExtension} from "./libraries/PoolExtension.sol";
 import {PositionExtension} from "./libraries/PositionExtension.sol";
-import {CLPool} from "pancake-v4-core/src/pool-cl/libraries/CLPool.sol";
-import {CLPoolGetters} from "pancake-v4-core/src/pool-cl/libraries/CLPoolGetters.sol";
-import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {CLPool} from "infinity-core/src/pool-cl/libraries/CLPool.sol";
+import {CLPoolGetters} from "infinity-core/src/pool-cl/libraries/CLPoolGetters.sol";
+import {CLPoolParametersHelper} from "infinity-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 abstract contract RewardTracker is IRewardTracker {
@@ -26,15 +26,27 @@ abstract contract RewardTracker is IRewardTracker {
     using CLPoolGetters for CLPool.State;
     using CLPoolParametersHelper for bytes32;
 
+    /// @dev The `account` is not Position Manager.
+    error PositionManagerOnlyExecutor(address account);
+
+    /// @notice Mapping of poolId to the tracked pool state
+    /// @dev Key is PoolId, value is PoolExtension state struct
     mapping(PoolId => PoolExtension.State) public pools;
+
+    /// @notice Mapping of tokenId to the tracked position state
+    /// @dev Key is tokenId, value is PositionExtension state struct
     mapping(uint256 => PositionExtension.State) public positions;
+
+    /// @notice Mapping of address to the accrued rewards
+    /// @dev Key is address, value is accrued rewards
     mapping(address => uint256) public accruedRewards;
+
     ICLPositionManager public immutable positionManager;
 
     modifier onlyPositionManager() {
         require(
             msg.sender == address(positionManager),
-            "InRangeIncentiveHook: only position manager"
+            PositionManagerOnlyExecutor(msg.sender)
         );
         _;
     }
@@ -61,7 +73,7 @@ abstract contract RewardTracker is IRewardTracker {
         int24 newActiveTick,
         int24 tickSpacing
     ) internal {
-        pools[id].crossToActiveTick(tickSpacing, newActiveTick);
+        pools[id].crossToTargetTick(tickSpacing, newActiveTick);
     }
 
     /// @notice collects the accrued rewards for the caller
@@ -80,13 +92,14 @@ abstract contract RewardTracker is IRewardTracker {
 
     function _handleRemovePosition(
         uint256 tokenId,
+        address owner,
         PoolKey memory key,
         CLPositionInfo positionInfo,
         uint128 liquidity
     ) internal {
         _accrueRewards(
             tokenId,
-            IERC721(address(positionManager)).ownerOf(tokenId),
+            owner,
             liquidity,
             pools[key.toId()].getRewardsPerLiquidityInsideX128(
                 positionInfo.tickLower(),
@@ -125,12 +138,12 @@ abstract contract RewardTracker is IRewardTracker {
      */
     function _beforeOnUnubscribeTracker(PoolKey memory key) internal virtual;
     /**
-     * @dev is called before handling reward tracking operations on transfer notification.
+     * @dev is called before handling reward tracking operations on burn notification.
      * Can be overriden to add custom logic.
      *
      * @param key The PoolKey of a transferred position.
      */
-    function _beforeOnTransferTracker(PoolKey memory key) internal virtual;
+    function _beforeOnBurnTracker(PoolKey memory key) internal virtual;
     /**
      * @dev is called before handling reward tracking operations on modify liquidity notification.
      * Can be overriden to add custom logic.
@@ -142,6 +155,7 @@ abstract contract RewardTracker is IRewardTracker {
     ) internal virtual;
 
     /// @inheritdoc ICLSubscriber
+    /// @notice that after subscribing the position should be unsubscribed before transferring - otherwise the rewards will be lost in favor of the new owner
     function notifySubscribe(
         uint256 tokenId,
         bytes memory
@@ -180,6 +194,7 @@ abstract contract RewardTracker is IRewardTracker {
 
         _handleRemovePosition(
             tokenId,
+            IERC721(address(positionManager)).ownerOf(tokenId),
             poolKey,
             positionInfo,
             uint128(liquidity)
@@ -223,27 +238,25 @@ abstract contract RewardTracker is IRewardTracker {
         );
     }
     /// @inheritdoc ICLSubscriber
-    function notifyTransfer(
+    function notifyBurn(
         uint256 tokenId,
-        address previousOwner,
-        address newOwner
+        address owner,
+        CLPositionInfo positionInfo,
+        uint256 liquidity,
+        BalanceDelta
     ) external override {
-        (PoolKey memory poolKey, CLPositionInfo positionInfo) = positionManager
-            .getPoolAndPositionInfo(tokenId);
+        (PoolKey memory poolKey, ) = positionManager.getPoolAndPositionInfo(
+            tokenId
+        );
 
-        // take liquididty before the change
-        uint128 liquidity = positionManager.getPositionLiquidity(tokenId);
+        _beforeOnBurnTracker(poolKey);
 
-        _beforeOnTransferTracker(poolKey);
-
-        _accrueRewards(
+        _handleRemovePosition(
             tokenId,
-            previousOwner,
-            liquidity,
-            pools[poolKey.toId()].getRewardsPerLiquidityInsideX128(
-                positionInfo.tickLower(),
-                positionInfo.tickUpper()
-            )
+            owner,
+            poolKey,
+            positionInfo,
+            uint128(liquidity)
         );
     }
     function getRewardsPerLiquidityInsideX128(

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.26;
+pragma solidity 0.8.26;
 
-import {BalanceDelta} from "pancake-v4-core/src/types/BalanceDelta.sol";
-import {Currency} from "pancake-v4-core/src/types/Currency.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {PoolId} from "pancake-v4-core/src/types/PoolId.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {BalanceDelta} from "infinity-core/src/types/BalanceDelta.sol";
+import {Currency} from "infinity-core/src/types/Currency.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
+import {PoolId} from "infinity-core/src/types/PoolId.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
 import {ArbiterAmAmmBaseHook} from "./ArbiterAmAmmBaseHook.sol";
 
 /// @notice ArbiterAmAmmBaseHook implements am-AMM auction and hook functionalities.
@@ -32,6 +32,19 @@ contract ArbiterAmAmmPoolCurrencyHook is ArbiterAmAmmBaseHook {
     ///////////////////////////////////////////////////////////////////////////////////
     //////////////////////// ArbiterAmAmmBase Internal Overrides /////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////
+
+    function _payRentAndChangeStrategyWhenNotLocked(
+        PoolKey memory key
+    ) internal override {
+        vault.lock(
+            abi.encode(
+                CallbackData(
+                    CallbackAction.PAY_RENT_AND_CHANGE_STRATEGY,
+                    abi.encode(PayRentAndChangeStrategyCallbackPayload(key))
+                )
+            )
+        );
+    }
     function _getPoolRentCurrency(
         PoolKey memory key
     ) internal view override returns (Currency) {

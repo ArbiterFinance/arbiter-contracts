@@ -1,39 +1,39 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 
-import {ICLPoolManager} from "pancake-v4-core/src/pool-cl/interfaces/ICLPoolManager.sol";
-import {IVault} from "pancake-v4-core/src/interfaces/IVault.sol";
-import {LPFeeLibrary} from "pancake-v4-core/src/libraries/LPFeeLibrary.sol";
-import {CLPoolManager} from "pancake-v4-core/src/pool-cl/CLPoolManager.sol";
-import {Vault} from "pancake-v4-core/src/Vault.sol";
-import {Currency, CurrencyLibrary} from "pancake-v4-core/src/types/Currency.sol";
-import {PoolKey} from "pancake-v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "pancake-v4-core/src/types/PoolId.sol";
-import {CLPoolParametersHelper} from "pancake-v4-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
-import {SortTokens} from "pancake-v4-core/test/helpers/SortTokens.sol";
-import {Deployers} from "pancake-v4-core/test/pool-cl/helpers/Deployers.sol";
+import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
+import {IVault} from "infinity-core/src/interfaces/IVault.sol";
+import {LPFeeLibrary} from "infinity-core/src/libraries/LPFeeLibrary.sol";
+import {CLPoolManager} from "infinity-core/src/pool-cl/CLPoolManager.sol";
+import {Vault} from "infinity-core/src/Vault.sol";
+import {Currency, CurrencyLibrary} from "infinity-core/src/types/Currency.sol";
+import {PoolKey} from "infinity-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "infinity-core/src/types/PoolId.sol";
+import {CLPoolParametersHelper} from "infinity-core/src/pool-cl/libraries/CLPoolParametersHelper.sol";
+import {SortTokens} from "infinity-core/test/helpers/SortTokens.sol";
+import {Deployers} from "infinity-core/test/pool-cl/helpers/Deployers.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {MockCLSwapRouter} from "./pool-cl/helpers/MockCLSwapRouter.sol";
 import {MockCLPositionManager} from "./pool-cl/helpers/MockCLPositionManager.sol";
 import {IArbiterFeeProvider} from "../src/interfaces/IArbiterFeeProvider.sol";
 import {IArbiterAmAmmHarbergerLease} from "../src/interfaces/IArbiterAmAmmHarbergerLease.sol";
 import {ArbiterAmAmmPoolCurrencyHook} from "../src/ArbiterAmAmmPoolCurrencyHook.sol";
-import {Hooks} from "pancake-v4-core/src/libraries/Hooks.sol";
-import {ICLRouterBase} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
+import {Hooks} from "infinity-core/src/libraries/Hooks.sol";
+import {ICLRouterBase} from "infinity-periphery/src/pool-cl/interfaces/ICLRouterBase.sol";
 import {DeployPermit2} from "permit2/test/utils/DeployPermit2.sol";
 import {IAllowanceTransfer} from "permit2/src/interfaces/IAllowanceTransfer.sol";
-import {ICLPositionDescriptor} from "pancake-v4-periphery/src/pool-cl/interfaces/ICLPositionDescriptor.sol";
-import {CLPositionDescriptorOffChain} from "pancake-v4-periphery/src/pool-cl/CLPositionDescriptorOffChain.sol";
-import {IWETH9} from "pancake-v4-periphery/src/interfaces/external/IWETH9.sol";
-import {IHooks} from "pancake-v4-core/src/interfaces/IHooks.sol";
+import {ICLPositionDescriptor} from "infinity-periphery/src/pool-cl/interfaces/ICLPositionDescriptor.sol";
+import {CLPositionDescriptorOffChain} from "infinity-periphery/src/pool-cl/CLPositionDescriptorOffChain.sol";
+import {IWETH9} from "infinity-periphery/src/interfaces/external/IWETH9.sol";
+import {IHooks} from "infinity-core/src/interfaces/IHooks.sol";
 import {CLTestUtils} from "./pool-cl/utils/CLTestUtils.sol";
-import {Constants} from "pancake-v4-core/test/pool-cl/helpers/Constants.sol";
-import {IPoolManager} from "pancake-v4-core/src/interfaces/IPoolManager.sol";
+import {Constants} from "infinity-core/test/pool-cl/helpers/Constants.sol";
+import {IPoolManager} from "infinity-core/src/interfaces/IPoolManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {CustomRevert} from "pancake-v4-core/src/libraries/CustomRevert.sol";
-import {ICLHooks} from "pancake-v4-core/src/pool-cl/interfaces/ICLHooks.sol";
+import {CustomRevert} from "infinity-core/src/libraries/CustomRevert.sol";
+import {ICLHooks} from "infinity-core/src/pool-cl/interfaces/ICLHooks.sol";
 
 import {AuctionSlot0, AuctionSlot0Library} from "../src/types/AuctionSlot0.sol";
 import {AuctionSlot1, AuctionSlot1Library} from "../src/types/AuctionSlot1.sol";
@@ -243,7 +243,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -300,7 +300,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -400,7 +400,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             abi.encodeWithSelector(
                 CustomRevert.WrappedError.selector,
                 address(arbiterHook),
-                ICLHooks.beforeInitialize.selector,
+                ICLHooks.afterInitialize.selector,
                 abi.encodeWithSelector(
                     IArbiterAmAmmHarbergerLease.NotDynamicFee.selector
                 ),
@@ -507,7 +507,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(currentStrategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -577,7 +577,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
 
         assertGt(
@@ -608,7 +608,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyBalancePostExpiry = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalancePostExpiry,
@@ -1009,7 +1009,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         // Assert
         uint256 strategyBalance = vault.balanceOf(
             address(strategy),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyBalance,
@@ -1212,7 +1212,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -1248,7 +1248,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
@@ -1258,7 +1258,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser1BalanceAfter = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1BalanceAfter,
@@ -1371,10 +1371,33 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
+
         assertEq(
             strategyUser2Balance,
+            0,
+            "Strategy user2 did receive fees in the same block as the overbid"
+        );
+
+        moveBlockBy(1);
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 strategyUser2Balance2 = vault.balanceOf(
+            address(strategyUser2),
+            key.currency0
+        );
+        assertEq(
+            strategyUser2Balance2,
             expectedFeeAmountUser2,
             "Strategy user2 did not receive the correct fees after winning"
         );
@@ -1473,6 +1496,29 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint128 amountIn = 1e18;
+
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint256 strategyUser2Balance = vault.balanceOf(
+            address(strategyUser2),
+            key.currency0
+        );
+        assertEq(
+            strategyUser2Balance,
+            0,
+            "Strategy user2 did receive fees in the same block as the overbid"
+        );
+
+        moveBlockBy(1);
+
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
                 poolKey: key,
@@ -1510,12 +1556,12 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
 
-        uint256 strategyUser2Balance = vault.balanceOf(
+        uint256 strategyUser2Balance2 = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
-            strategyUser2Balance,
+            strategyUser2Balance2,
             expectedFeeAmountUser2,
             "Strategy user2 did not receive the correct fees after winning"
         );
@@ -1629,7 +1675,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser1Balance = vault.balanceOf(
             address(strategyUser1),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser1Balance,
@@ -1708,7 +1754,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
-            key.currency1
+            key.currency0
         );
         assertEq(
             strategyUser2Balance,
@@ -1739,6 +1785,277 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         assertTrue(
             user1BalancePostWithdraw >= user1BalancePreDeposit,
             "User1 should end up with at least their initial balance (including refunds)"
+        );
+    }
+
+    function test_ArbiterAmAmmPoolCurrencyHook_CollectFeeAcrossSwaps() public {
+        // Scenario:
+        // 1. Set an auction fee.
+        // 2. User1 deposits and overbids, becoming the winner.
+        // 3. After 10 blocks, perform a swap -> User1 pays rent for 10 blocks, User1 strategy collects fees.
+        // 4. User2 deposits and overbids with a higher rent in a new block, becoming the new winner.
+        //    Upon takeover, User1 gets refunded remaining rent + a portion of the previously locked fee (feeRefund).
+        // 5. After another 10 blocks, perform a second swap -> User2 pays rent for 10 blocks, User2 strategy collects fees.
+        // 6. User1, who is no longer the winner, can now withdraw their remaining deposit, including refunded rent and fee portion.
+        // 7. Verify protocol fee distribution and that User1 ends up with the correct refunded amounts.
+
+        resetCurrentBlock();
+
+        // Set auction fee to 500 (0.05%)
+        arbiterHook.setAuctionFee(key, 500);
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        // Define rents and strategies
+        uint24 feeUser1 = 1000; // 0.1%
+        uint24 feeUser2 = 2000; // 0.2%
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        // User1 scenario
+        uint80 user1RentPerBlock = 10e18;
+        uint128 user1TotalRent = user1RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
+        uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
+        uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+        transferToAndDepositAs(user1Deposit, user1);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1RentPerBlock,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        uint128 amountIn = 1e18;
+        exactInputSingle(
+            ICLRouterBase.CLSwapExactInputSingleParams({
+                poolKey: key,
+                zeroForOne: true,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                hookData: ZERO_BYTES
+            })
+        );
+
+        uint128 remainingRentAfterSwapUser1 = arbiterHook
+            .poolSlot1(id)
+            .remainingRent();
+
+        assertEq(
+            remainingRentAfterSwapUser1,
+            user1TotalRent - 10 * user1RentPerBlock,
+            "Remaining rent should be less than user1's total rent after first swap"
+        );
+
+        uint256 feeAmountUser1 = (amountIn * feeUser1) / 1e6;
+        uint256 expectedFeeAmountUser1 = (feeAmountUser1 *
+            DEFAULT_WINNER_FEE_SHARE) / 1e6;
+        uint256 strategyUser1Balance = vault.balanceOf(
+            address(strategyUser1),
+            key.currency0
+        );
+        assertEq(
+            strategyUser1Balance,
+            expectedFeeAmountUser1,
+            "Strategy user1 did not receive correct fees after first swap"
+        );
+
+        uint80 user2RentPerBlock = 20e18;
+        uint128 user2TotalRent = user2RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
+        uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
+        uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
+
+        uint32 rentEndBlock2 = uint32(
+            STARTING_BLOCK + 10 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(user2Deposit, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2RentPerBlock,
+            rentEndBlock2,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
+        uint128 remainingRentAfterUser2Overbid = slot1.remainingRent();
+
+        address currentWinner = arbiterHook.winner(key);
+        assertEq(currentWinner, user2, "User2 should be the new winner");
+
+        (
+            uint128 initialRemainingRent,
+            uint128 feeLocked,
+            uint128 collectedFee
+        ) = arbiterHook.auctionFees(id);
+        assertEq(
+            feeLocked,
+            user2AuctionFee,
+            "Auction fee should be collected for user2"
+        );
+
+        assertEq(
+            initialRemainingRent,
+            user2TotalRent,
+            "Initial remaining rent should be equal to user2's total rent"
+        );
+
+        uint128 feeRefund = uint128(
+            (uint256(user1AuctionFee) * remainingRentAfterSwapUser1) /
+                user1TotalRent
+        );
+
+        assertEq(
+            collectedFee,
+            user1AuctionFee - feeRefund,
+            "Collected fee should be greater than zero after user2 overbid - user1 fee refund but part of it got captured"
+        );
+        moveBlockBy(100);
+
+        transferToAndDepositAs(user2Deposit * 1000000, user1);
+        uint32 user1RentEndBlock2 = uint32(
+            STARTING_BLOCK + 10 + 100 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+        uint128 user1RentPerBlock2 = user2RentPerBlock * 100;
+
+        uint128 user1TotalRent2 = user2RentPerBlock *
+            100 *
+            (DEFAULT_MINIMUM_RENT_BLOCKS);
+        uint128 user1AuctionFee2 = (user1TotalRent2 * hookAuctionFee) / 1e6;
+
+        uint128 user2RemainingRentBeforeUser1Overbids2 = arbiterHook
+            .poolSlot1(id)
+            .remainingRent();
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            uint80(user1RentPerBlock2),
+            user1RentEndBlock2,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        (
+            uint128 initialRemainingRent2,
+            uint128 feeLocked2,
+            uint128 collectedFee2
+        ) = arbiterHook.auctionFees(id);
+
+        uint128 rentFromBlocksPassed = 100 * user2RentPerBlock;
+
+        uint128 feeRefund2 = uint128(
+            (uint256(user2AuctionFee) *
+                (user2RemainingRentBeforeUser1Overbids2 -
+                    rentFromBlocksPassed)) / user2TotalRent
+        );
+
+        assertEq(
+            collectedFee2,
+            collectedFee + (user2AuctionFee - feeRefund2),
+            "The fee should be collected for user1 after the second overbid"
+        );
+    }
+    function test_ArbiterAmAmmPoolCurrencyHook_OverbidMultipleBids_RemainingRentCalculation()
+        public
+    {
+        // Scenario:
+        // 1. Set an auction fee.
+        // 2. User1 deposits and overbids, becoming the winner.
+        // 3. After 10 blocks, User2 deposits & performs an overbid -> User1 pays rent for 10 blocks, User1 strategy collects fees.
+        // User2 becomes the new winner. Upon takeover, User1 gets refunded remaining rent + a portion of the previously locked fee (feeRefund).
+        // The fee collected by the hook should be calculated accordingly.
+
+        resetCurrentBlock();
+
+        // Set auction fee to 500 (0.05%)
+        uint24 auctionFee = 500;
+        arbiterHook.setAuctionFee(key, 500);
+
+        AuctionSlot0 slot0 = arbiterHook.poolSlot0(id);
+        uint24 hookAuctionFee = slot0.auctionFee();
+        assertEq(hookAuctionFee, 500, "Auction fee should be 500");
+
+        // Define rents and strategies
+        uint24 feeUser1 = 1000; // 0.1%
+        uint24 feeUser2 = 2000; // 0.2%
+        MockStrategy strategyUser1 = new MockStrategy(feeUser1);
+        MockStrategy strategyUser2 = new MockStrategy(feeUser2);
+
+        uint32 rentEndBlock = uint32(
+            STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        // User1
+        uint80 user1RentPerBlock = 10e18;
+        uint128 user1TotalRent = user1RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
+        uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
+        uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
+
+        uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
+        transferToAndDepositAs(user1Deposit, user1);
+
+        vm.startPrank(user1);
+        arbiterHook.overbid(
+            key,
+            user1RentPerBlock,
+            rentEndBlock,
+            address(strategyUser1)
+        );
+        vm.stopPrank();
+
+        moveBlockBy(10);
+
+        uint80 user2RentPerBlock = 20e18;
+        uint128 user2TotalRent = user2RentPerBlock *
+            DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
+        uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
+        uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
+
+        uint32 rentEndBlock2 = uint32(
+            STARTING_BLOCK + 10 + DEFAULT_MINIMUM_RENT_BLOCKS
+        );
+
+        transferToAndDepositAs(user2Deposit, user2);
+        vm.startPrank(user2);
+        arbiterHook.overbid(
+            key,
+            user2RentPerBlock,
+            rentEndBlock2,
+            address(strategyUser2)
+        );
+        vm.stopPrank();
+
+        address currentWinner = arbiterHook.winner(key);
+        assertEq(currentWinner, user2, "User2 should be the new winner");
+
+        (, , uint128 collectedFee) = arbiterHook.auctionFees(id);
+
+        uint128 expectedFeePaidOnOverbidByUser1 = ((user1RentPerBlock * 10) *
+            auctionFee) / 1e6;
+
+        assertEq(
+            collectedFee,
+            expectedFeePaidOnOverbidByUser1,
+            "Collected fee should calculated accordingly after user2 overbid - user1 fee refund but part of it got captured"
         );
     }
 }
