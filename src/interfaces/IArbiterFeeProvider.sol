@@ -16,5 +16,5 @@ interface IArbiterFeeProvider {
         PoolKey calldata key,
         ICLPoolManager.SwapParams calldata params,
         bytes calldata hookData
-    ) external view returns (uint24);
+    ) external returns (uint24);
 }

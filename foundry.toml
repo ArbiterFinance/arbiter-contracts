@@ -6,6 +6,16 @@ solc_version = '0.8.26'
 evm_version = 'cancun'
 via_ir = true
 
+remappings = [
+    "forge-std/=lib/infinity-universal-router/lib/forge-std/src/",
+    "@openzeppelin/contracts/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/lib/openzeppelin-contracts/contracts/",
+    "solmate/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/lib/solmate/",
+    "infinity-core/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/",
+    "infinity-periphery/=lib/infinity-universal-router/lib/infinity-periphery/",
+    "infinity-universal-router/=lib/infinity-universal-router/",
+    "permit2/=lib/infinity-universal-router/lib/infinity-periphery/lib/permit2/",
+]
+
 [rpc_endpoints]
 bsc-testnet= "${BSCTEST_RPC_URL}"
 

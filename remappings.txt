@@ -1,7 +1,13 @@
-forge-std/=lib/infinity-universal-router/lib/forge-std/src
+forge-std/=lib/infinity-universal-router/lib/forge-std/src/
 @openzeppelin/contracts/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/lib/openzeppelin-contracts/contracts/
 solmate/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/lib/solmate/
 infinity-core/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/
 infinity-periphery/=lib/infinity-universal-router/lib/infinity-periphery/
 infinity-universal-router/=lib/infinity-universal-router/
 permit2/=lib/infinity-universal-router/lib/infinity-periphery/lib/permit2/
+ds-test/=lib/infinity-universal-router/lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/infinity-universal-router/lib/pancake-create3-factory/lib/openzeppelin-contracts/lib/erc4626-tests/
+forge-gas-snapshot/=lib/infinity-universal-router/lib/pancake-create3-factory/lib/forge-gas-snapshot/src/
+halmos-cheatcodes/=lib/infinity-universal-router/lib/infinity-periphery/lib/infinity-core/lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/
+openzeppelin-contracts/=lib/infinity-universal-router/lib/pancake-create3-factory/lib/openzeppelin-contracts/
+pancake-create3-factory/=lib/infinity-universal-router/lib/pancake-create3-factory/
