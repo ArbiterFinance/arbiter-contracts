@@ -60,13 +60,13 @@ abstract contract ArbiterAmAmmBaseHook is
         bytes data;
     }
 
-    uint32 internal _transitionBlocks = 30;
-    uint32 internal _minRentBlocks = 300;
+    uint32 internal _transitionBlocks = 80; // 80 blocks = 1 minute with 0.75 second block time
+    uint32 internal _minRentBlocks = 115200; // 115200 blocks = 1 day with 0.75 second block time
     uint24 internal _overbidFactor = 2e4; // 2%
-    uint24 internal _defaultAuctionFee = 0;
-    uint24 internal _defaultWinnerFeeShare = 5e4;
-    uint8 internal _defaultStrategyGasLimit = 13;
-    uint16 internal _defaultSwapFee = 4e2; // 0.04%
+    uint24 internal _defaultAuctionFee = 0; // no fee
+    uint24 internal _defaultWinnerFeeShare = 5e4; // 5%
+    uint8 internal _defaultStrategyGasLimit = 46; // ~ 70k gwei of gas
+    uint16 internal _defaultSwapFee = 5e2; // 0.05%
 
     /// @notice Mapping of the PoolId to the auction's configuration and state.
     /// @dev Key is the PoolId, value is the AuctionSlot0 struct
@@ -208,7 +208,8 @@ abstract contract ArbiterAmAmmBaseHook is
                 gas: 2 << slot0.strategyGasLimit()
             }(sender, key, params, hookData)
         returns (uint24 _fee) {
-            if (_fee <= 1e6) {
+            if (_fee <= 1e4) {
+                // returned fee must be smaller than 1% or default fee is used
                 fee = _fee;
             }
         } catch {}
