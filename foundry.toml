@@ -5,6 +5,11 @@ libs = ["lib"]
 solc_version = '0.8.26'
 evm_version = 'cancun'
 via_ir = true
+optimizer = true
+optimizer-runs = 10_000_000
+
+[profile.lite]
+optimizer = false
 
 [rpc_endpoints]
 bsc-testnet= "${BSCTEST_RPC_URL}"

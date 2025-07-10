@@ -46,7 +46,6 @@ contract DeployPoolTokenBSC is Script {
         IAllowanceTransfer(0x31c2F6fcFf4F8759b3Bd5Bf0e1084A055615c768);
 
     address deployer;
-    address timelockOwner = 0x13AEd1CaFe1A30a6A6d2946485e541e9eD2A077B;
 
     function setUp() public {
         deployer = vm.envAddress("ADDRESS");
@@ -57,30 +56,15 @@ contract DeployPoolTokenBSC is Script {
         vm.createSelectFork("bsc");
         vm.startBroadcast();
 
-        // deploy timelock controller
-        //constructor(uint256 minDelay, address[] memory proposers, address[] memory executors, address admin) {
-        address[] memory proposers = new address[](1);
-        proposers[0] = timelockOwner;
-        address[] memory executors = new address[](1);
-        executors[0] = timelockOwner;
-
-        TimelockController timelock = new TimelockController(
-            0,
-            proposers,
-            executors,
-            timelockOwner
-        );
-
         // Deploy the arbiter hook with required parameters
         bool rentInTokenZero = true;
         ArbiterAmAmmPoolCurrencyHook arbiterHook = new ArbiterAmAmmPoolCurrencyHook(
                 ICLPoolManager(address(clPoolManager)),
                 rentInTokenZero,
-                address(timelock)
+                address(0xfa206DAB60c014bEb6833004D8848910165e6047)
             );
 
         console.log("rentInTokenZero: ", rentInTokenZero);
-        console.log("Timelock address: ", address(timelock));
         console.log("Arbiter Hook address: ", address(arbiterHook));
 
         vm.stopBroadcast();

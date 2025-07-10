@@ -1350,16 +1350,13 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         vm.stopPrank();
 
         address winner = arbiterHook.winner(key);
-        console.log("A");
         assertEq(
             winner,
             user2,
             "User2 should be the winner after the higher overbid in the same block"
         );
-        console.log("B");
 
         uint128 amountIn = 1e18;
-        console.log("C");
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
                 poolKey: key,
@@ -1369,19 +1366,15 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
                 hookData: ZERO_BYTES
             })
         );
-        console.log("D");
 
         uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
-        console.log("E");
         uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
-        console.log("F");
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
             key.currency0
         );
-        console.log("G");
 
         assertEq(
             strategyUser2Balance,
