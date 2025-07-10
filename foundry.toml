@@ -8,6 +8,9 @@ via_ir = true
 
 [rpc_endpoints]
 bsc-testnet= "${BSCTEST_RPC_URL}"
+bsc= "${BSC_RPC_URL}"
 
 [etherscan]
-bsc-testnet = { key = "${BSCSCAN_API_KEY}", url = "https://api-testnet.bscscan.com/api" }
+bsc-testnet = { key = "${BSC_TEST_SCAN_API_KEY}", url = "https://api-testnet.bscscan.com/api" }
+bsc = { key = "${BSC_SCAN_API_KEY}", url = "https://api.bscscan.com/api" }
+
