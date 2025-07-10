@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
-
 import {Test} from "forge-std/Test.sol";
 
 import {ICLPoolManager} from "infinity-core/src/pool-cl/interfaces/ICLPoolManager.sol";
@@ -67,16 +66,16 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
     using AuctionSlot0Library for AuctionSlot0;
     using AuctionSlot1Library for AuctionSlot1;
 
-    uint24 constant DEFAULT_SWAP_FEE = 300;
+    uint24 constant DEFAULT_SWAP_FEE = 500;
     bytes constant ZERO_BYTES = bytes("");
     uint256 constant STARTING_BLOCK = 10000000;
     uint256 CURRENT_BLOCK_NUMBER = 10000000;
 
     uint32 internal DEFAULT_TRANSITION_BLOCKS = 30;
-    uint32 internal DEFAULT_MINIMUM_RENT_BLOCKS = 300;
+    uint32 internal DEFAULT_MINIMUM_RENT_BLOCKS = 115200;
     uint24 internal DEFAULT_OVERBID_FACTOR = 2e4; // 2%
     uint24 internal DEFAULT_WINNER_FEE_SHARE = 5e4;
-    uint24 constant DEFAULT_POOL_SWAP_FEE = 50000; // 5%
+    uint24 constant DEFAULT_POOL_SWAP_FEE = 5000; // 0.5%
 
     MockCLSwapRouter swapRouter;
 
@@ -151,7 +150,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
     function test_ArbiterAmAmmPoolCurrencyHook_BiddingAndRentPayment() public {
         resetCurrentBlock();
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         //offset blocks
         moveBlockBy(100);
 
@@ -194,7 +193,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -260,7 +259,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 strategyFee = 1e6 + 1000; // Fee greater than DEFAULT_POOL_SWAP_FEE
         MockStrategy strategy = new MockStrategy(strategyFee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -292,7 +291,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint256 postBalance0 = key.currency0.balanceOf(address(this));
         uint256 postBalance1 = key.currency1.balanceOf(address(this));
 
-        uint256 feeAmount = (amountIn * 400) / 1e6; //capped at 1e6 (100%) - if exceeds it reverts to default fee
+        uint256 feeAmount = (amountIn * DEFAULT_SWAP_FEE) / 1e6; //capped at 1e6 (100%) - if exceeds it reverts to default fee
         uint256 expectedFeeAmount = (feeAmount * DEFAULT_WINNER_FEE_SHARE) /
             1e6;
 
@@ -357,7 +356,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
     function test_ArbiterAmAmmPoolCurrencyHook_ChangeStrategy() public {
         resetCurrentBlock();
         // User1 overbids and becomes the winner
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -413,7 +412,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
     function test_ArbiterAmAmmPoolCurrencyHook_RentTooLow() public {
         resetCurrentBlock();
         // User1 deposits currency0
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.prank(user1);
         arbiterHook.overbid(
@@ -436,7 +435,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
     {
         resetCurrentBlock();
         // User1 overbids and becomes the winner
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -524,7 +523,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
         // User1 deposits and overbids with the strategy
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
 
         // Set rent to expire in 300 blocks
@@ -625,7 +624,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
         assertEq(initialDeposit, 0, "Initial deposit should be zero");
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         uint256 postDeposit = arbiterHook.depositOf(
             Currency.unwrap(currency0),
@@ -633,7 +632,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
         assertEq(
             postDeposit,
-            10_000e18,
+            100_000_000e18,
             "Deposit amount does not match expected value"
         );
     }
@@ -661,7 +660,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -695,7 +694,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -730,7 +729,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -760,7 +759,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
 
@@ -783,7 +782,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         assertEq(initialRentPerBlock, 0, "Initial rentPerBlock should be zero");
 
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
 
         arbiterHook.overbid(
@@ -837,7 +836,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
         MockStrategy strategy = new MockStrategy(DEFAULT_POOL_SWAP_FEE);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(key, 10e18, desiredRentEndBlock, address(strategy));
@@ -857,7 +856,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -885,7 +884,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -914,7 +913,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -943,7 +942,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -976,7 +975,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 updatedFee = 2000;
         MockStrategy strategy = new MockStrategy(initialFee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(
             key,
@@ -1021,7 +1020,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
     /// test executing 3 swaps, after each checks remainingRent decreasing appropriately (calling via remainingRent)
     function test_ArbiterAmAmmPoolCurrencyHook_RemainingRentDecreases() public {
         resetCurrentBlock();
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         // User1 overbids
         vm.prank(user1);
@@ -1061,9 +1060,9 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         // Check remaining rent
         AuctionSlot1 slot1 = arbiterHook.poolSlot1(id);
         uint128 remainingRent = slot1.remainingRent();
-        assertLt(
+        assertEq(
             remainingRent,
-            10_000e18,
+            1151900000000000000000000, // 10e18 * 11519 - ten blocks passed
             "Remaining rent should be less than initial deposit"
         );
 
@@ -1115,7 +1114,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -1155,7 +1154,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         uint24 fee = 1000;
         MockStrategy strategy = new MockStrategy(fee);
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
 
         vm.startPrank(user1);
         arbiterHook.overbid(
@@ -1189,7 +1188,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             STARTING_BLOCK + DEFAULT_MINIMUM_RENT_BLOCKS
         );
 
-        transferToAndDepositAs(10_000e18, user1);
+        transferToAndDepositAs(100_000_000e18, user1);
         vm.startPrank(user1);
         arbiterHook.overbid(key, 10e18, rentEndBlock, address(strategyUser1));
         vm.stopPrank();
@@ -1220,7 +1219,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
             "Strategy user1 did not receive correct fees after first swap"
         );
 
-        transferToAndDepositAs(20_000e18, user2);
+        transferToAndDepositAs(20_000_000e18, user2);
 
         vm.startPrank(user2);
         arbiterHook.overbid(
@@ -1279,7 +1278,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         uint24 hookAuctionFee = slot0.auctionFee();
         assertEq(hookAuctionFee, 500, "Auction fee should be 500");
-        uint128 totalRent = rentPerBlock * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 totalRent = uint128(rentPerBlock) * DEFAULT_MINIMUM_RENT_BLOCKS;
         uint128 auctionFee = (totalRent * hookAuctionFee) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
 
@@ -1322,7 +1321,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint80 user1Rent = 10e18;
-        uint80 user1Deposit = user1Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 user1Deposit = uint128(user1Rent) * DEFAULT_MINIMUM_RENT_BLOCKS;
 
         uint256 user1BalancePreDeposit = key.currency0.balanceOf(user1);
 
@@ -1337,7 +1336,10 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         vm.stopPrank();
 
         uint80 user2Rent = 20e18;
-        transferToAndDepositAs(user2Rent * DEFAULT_MINIMUM_RENT_BLOCKS, user2);
+        transferToAndDepositAs(
+            uint128(user2Rent) * DEFAULT_MINIMUM_RENT_BLOCKS,
+            user2
+        );
         vm.startPrank(user2);
         arbiterHook.overbid(
             key,
@@ -1348,13 +1350,16 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         vm.stopPrank();
 
         address winner = arbiterHook.winner(key);
+        console.log("A");
         assertEq(
             winner,
             user2,
             "User2 should be the winner after the higher overbid in the same block"
         );
+        console.log("B");
 
         uint128 amountIn = 1e18;
+        console.log("C");
         exactInputSingle(
             ICLRouterBase.CLSwapExactInputSingleParams({
                 poolKey: key,
@@ -1364,15 +1369,19 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
                 hookData: ZERO_BYTES
             })
         );
+        console.log("D");
 
         uint256 feeAmountUser2 = (amountIn * feeUser2) / 1e6;
+        console.log("E");
         uint256 expectedFeeAmountUser2 = (feeAmountUser2 *
             DEFAULT_WINNER_FEE_SHARE) / 1e6;
+        console.log("F");
 
         uint256 strategyUser2Balance = vault.balanceOf(
             address(strategyUser2),
             key.currency0
         );
+        console.log("G");
 
         assertEq(
             strategyUser2Balance,
@@ -1435,7 +1444,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
     }
 
-    function test_ArbiterAmAmmPoolCurrencyHook_TwoUsersOverbidSameBlockWithAuctionFee()
+    function test_ArbiterAmAmmPoolCurrencyHook_TwoUsersOverbidSameXBlockWithAuctionFee()
         public
     {
         resetCurrentBlock();
@@ -1457,7 +1466,8 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint80 user1Rent = 10e18;
-        uint128 user1TotalRent = user1Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 user1TotalRent = uint128(user1Rent) *
+            DEFAULT_MINIMUM_RENT_BLOCKS;
         uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6;
         uint128 user1Deposit = user1TotalRent + user1AuctionFee;
 
@@ -1474,7 +1484,8 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         vm.stopPrank();
 
         uint80 user2Rent = 20e18;
-        uint128 user2TotalRent = user2Rent * DEFAULT_MINIMUM_RENT_BLOCKS;
+        uint128 user2TotalRent = uint128(user2Rent) *
+            DEFAULT_MINIMUM_RENT_BLOCKS;
         uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6;
         uint128 user2Deposit = user2TotalRent + user2AuctionFee;
 
@@ -1630,7 +1641,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         // User1 scenario
         uint80 user1RentPerBlock = 10e18;
-        uint128 user1TotalRent = user1RentPerBlock *
+        uint128 user1TotalRent = uint128(user1RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
         uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
         uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
@@ -1684,7 +1695,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint80 user2RentPerBlock = 20e18;
-        uint128 user2TotalRent = user2RentPerBlock *
+        uint128 user2TotalRent = uint128(user2RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
         uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
         uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
@@ -1819,7 +1830,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         // User1 scenario
         uint80 user1RentPerBlock = 10e18;
-        uint128 user1TotalRent = user1RentPerBlock *
+        uint128 user1TotalRent = uint128(user1RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
         uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
         uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
@@ -1873,7 +1884,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
 
         uint80 user2RentPerBlock = 20e18;
-        uint128 user2TotalRent = user2RentPerBlock *
+        uint128 user2TotalRent = uint128(user2RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
         uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
         uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18
@@ -1933,7 +1944,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         );
         uint128 user1RentPerBlock2 = user2RentPerBlock * 100;
 
-        uint128 user1TotalRent2 = user2RentPerBlock *
+        uint128 user1TotalRent2 = uint128(user2RentPerBlock) *
             100 *
             (DEFAULT_MINIMUM_RENT_BLOCKS);
         uint128 user1AuctionFee2 = (user1TotalRent2 * hookAuctionFee) / 1e6;
@@ -2005,7 +2016,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
 
         // User1
         uint80 user1RentPerBlock = 10e18;
-        uint128 user1TotalRent = user1RentPerBlock *
+        uint128 user1TotalRent = uint128(user1RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 10e18 * 300 = 3000e18
         uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6; // (3000e18 * 500)/1e6 = 1.5e18
         uint128 user1Deposit = user1TotalRent + user1AuctionFee; // 3000e18 + 1.5e18 = 3001.5e18
@@ -2025,7 +2036,7 @@ contract ArbiterAmAmmPoolCurrencyHookTest is Test, CLTestUtils {
         moveBlockBy(10);
 
         uint80 user2RentPerBlock = 20e18;
-        uint128 user2TotalRent = user2RentPerBlock *
+        uint128 user2TotalRent = uint128(user2RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS; // 20e18 * 300 = 6000e18
         uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6; // (6000e18 * 500)/1e6 = 3e18
         uint128 user2Deposit = user2TotalRent + user2AuctionFee; // 6000e18 + 3e18 = 6003e18

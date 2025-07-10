@@ -80,7 +80,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
     uint256 CURRENT_BLOCK_NUMBER = STARTING_BLOCK;
 
     uint24 constant DEFAULT_SWAP_FEE = 300;
-    uint32 constant DEFAULT_MINIMUM_RENT_BLOCKS = 300;
+    uint32 constant DEFAULT_MINIMUM_RENT_BLOCKS = 115200;
     uint24 constant DEFAULT_WINNER_FEE_SHARE = 50_000; // 5%
     uint24 constant DEFAULT_POOL_SWAP_FEE = 50_000; // 5%
     bytes constant ZERO_BYTES = bytes("");
@@ -514,7 +514,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
 
         // User1 scenario
         uint80 user1RentPerBlock = 10e18;
-        uint128 user1TotalRent = user1RentPerBlock *
+        uint128 user1TotalRent = uint128(user1RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS;
         uint128 user1AuctionFee = (user1TotalRent * hookAuctionFee) / 1e6;
         uint128 user1Deposit = user1TotalRent + user1AuctionFee;
@@ -577,7 +577,7 @@ contract ArbiterAmAmmAnyERC20HookTest is Test, CLTestUtils {
         );
 
         uint80 user2RentPerBlock = 20e18;
-        uint128 user2TotalRent = user2RentPerBlock *
+        uint128 user2TotalRent = uint128(user2RentPerBlock) *
             DEFAULT_MINIMUM_RENT_BLOCKS;
         uint128 user2AuctionFee = (user2TotalRent * hookAuctionFee) / 1e6;
         uint128 user2Deposit = user2TotalRent + user2AuctionFee;

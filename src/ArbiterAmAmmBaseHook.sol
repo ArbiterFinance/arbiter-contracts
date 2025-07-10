@@ -447,7 +447,7 @@ abstract contract ArbiterAmAmmBaseHook is
         unchecked {
             rentBlockLength = rentEndBlock - uint32(block.number);
         }
-        uint128 totalRent = rentPerBlock * rentBlockLength;
+        uint128 totalRent = uint128(rentPerBlock) * rentBlockLength;
         uint128 auctionFee = (totalRent * slot0.auctionFee()) / 1e6;
         uint128 requiredDeposit = totalRent + auctionFee;
 
@@ -618,7 +618,7 @@ abstract contract ArbiterAmAmmBaseHook is
             blocksElapsed = uint32(block.number) - lastPaidBlock;
         }
 
-        uint128 rentAmount = slot1.rentPerBlock() * blocksElapsed;
+        uint128 rentAmount = uint128(slot1.rentPerBlock()) * blocksElapsed;
 
         if (rentAmount >= remainingRent) {
             // pay the remainingRent and reset the auction - no winner
