@@ -169,7 +169,9 @@ abstract contract ArbiterAmAmmBaseHook is
         ICLPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual override poolManagerOnly returns (bytes4) {
-        _payRentAndChangeStrategyWhenLocked(key);
+        if (poolManager.getLiquidity(key.toId()) > 0) {
+            _payRentAndChangeStrategyWhenLocked(key);
+        }
         return this.beforeAddLiquidity.selector;
     }
 
@@ -526,7 +528,7 @@ abstract contract ArbiterAmAmmBaseHook is
             revert CallerNotWinner();
         }
         winnerStrategies[poolId] = strategy;
-        poolSlot0[poolId].setShouldChangeStrategy(true);
+        poolSlot0[poolId] = poolSlot0[poolId].setShouldChangeStrategy(true);
 
         emit StrategyChanged(poolId, strategy);
     }
